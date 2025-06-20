@@ -1,0 +1,6 @@
+PySide6[multimedia,webengine]
+openai
+requests
+python-lsp-server[all]
+pylsp-mypy
+python-lsp-black
