@@ -635,20 +635,31 @@ class SandboxWidget(QWidget):
         if func.name == "<module>":
             return "(module)"
         
+        # Try to get type annotations from the code object's constants
+        annotations = self._extract_annotations(func)
+        
         # Build parameter list
         params = []
         
         # Regular positional arguments
         for i in range(func.argcount):
             if i < len(func.varnames):
-                params.append(func.varnames[i])
+                param_name = func.varnames[i]
+                if param_name in annotations:
+                    params.append(f"{param_name}: {annotations[param_name]}")
+                else:
+                    params.append(param_name)
         
         # Keyword-only arguments
         kwonly_start = func.argcount
         for i in range(func.kwonlyargcount):
             param_idx = kwonly_start + i
             if param_idx < len(func.varnames):
-                params.append(f"{func.varnames[param_idx]}=...")
+                param_name = func.varnames[param_idx]
+                if param_name in annotations:
+                    params.append(f"{param_name}: {annotations[param_name]}=...")
+                else:
+                    params.append(f"{param_name}=...")
         
         # Add *args if there are more varnames than accounted for
         remaining_vars = len(func.varnames) - func.argcount - func.kwonlyargcount
@@ -660,7 +671,32 @@ class SandboxWidget(QWidget):
                 params.append("**kwargs")
         
         signature = f"({', '.join(params)})"
+        
+        # Add return type annotation if available
+        if 'return' in annotations:
+            signature += f" -> {annotations['return']}"
+        
         return signature
+    
+    def _extract_annotations(self, func):
+        """Extract type annotations from function constants"""
+        annotations = {}
+        
+        # Look for __annotations__ in constants
+        for const in func.constants:
+            if isinstance(const, dict):
+                # Check if this looks like an annotations dict
+                for key, value in const.items():
+                    if isinstance(key, str):
+                        # Convert type objects to string representations
+                        if hasattr(value, '__name__'):
+                            annotations[key] = value.__name__
+                        elif hasattr(value, '_name'):  # typing module types
+                            annotations[key] = str(value)
+                        else:
+                            annotations[key] = str(value)
+        
+        return annotations
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
