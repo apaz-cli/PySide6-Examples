@@ -660,43 +660,16 @@ class SandboxWidget(QWidget):
         if func.name == "<module>":
             return "(module)"
         
-        # Try to use inspect.signature() if we have the function object
+        # Use inspect.signature() if we have the function object
         if hasattr(self.analyzer, 'function_objects') and func.name in self.analyzer.function_objects:
             try:
                 func_obj = self.analyzer.function_objects[func.name]
                 sig = inspect.signature(func_obj)
                 return str(sig)
             except Exception:
-                pass  # Fall back to manual method
+                return "(signature unavailable)"
         
-        # Fallback to manual signature building
-        return self._build_manual_signature(func)
-    
-    def _build_manual_signature(self, func):
-        """Build signature manually from bytecode info"""
-        params = []
-        
-        # Regular positional arguments
-        for i in range(func.argcount):
-            if i < len(func.varnames):
-                params.append(func.varnames[i])
-        
-        # Keyword-only arguments
-        kwonly_start = func.argcount
-        for i in range(func.kwonlyargcount):
-            param_idx = kwonly_start + i
-            if param_idx < len(func.varnames):
-                params.append(f"{func.varnames[param_idx]}=...")
-        
-        # Add *args/**kwargs if there are more varnames
-        remaining_vars = len(func.varnames) - func.argcount - func.kwonlyargcount
-        if remaining_vars > 0:
-            if remaining_vars >= 1:
-                params.append("*args")
-            if remaining_vars >= 2:
-                params.append("**kwargs")
-        
-        return f"({', '.join(params)})"
+        return "(signature unavailable)"
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
