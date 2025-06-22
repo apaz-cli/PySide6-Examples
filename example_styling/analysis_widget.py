@@ -36,9 +36,11 @@ class AnalysisWidget(QWidget):
         self.current_file = None
         self.current_language = None
         self.worker = None
+        self.server_available = False
         self.setup_ui()
         self.connect_signals()
         self.apply_theme()
+        self.check_server_availability()
     
     def setup_ui(self):
         """Setup the analysis UI"""
@@ -49,6 +51,13 @@ class AnalysisWidget(QWidget):
         self.status_label = QLabel("No file selected")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
+        
+        # Error message widget (hidden by default)
+        self.error_widget = QLabel()
+        self.error_widget.setWordWrap(True)
+        self.error_widget.setAlignment(Qt.AlignCenter)
+        self.error_widget.hide()
+        layout.addWidget(self.error_widget)
         
         # Main tab widget for different languages
         self.main_tab_widget = QTabWidget()
@@ -511,3 +520,37 @@ class AnalysisWidget(QWidget):
         
         # Apply status label style
         self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
+    
+    def check_server_availability(self):
+        """Check if analysis server is available"""
+        self.server_available = self.api_client.health_check()
+        
+        if not self.server_available:
+            self.show_server_unavailable_message()
+    
+    def show_server_unavailable_message(self):
+        """Show server unavailable message and hide analysis UI"""
+        self.status_label.setText("⚠️ Analysis server cannot be reached")
+        self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        
+        # Hide the main analysis UI
+        self.main_tab_widget.hide()
+        
+        # Show error message
+        self.error_widget.setText(
+            "The analysis server is not available.\n\n"
+            "Please ensure the server is running and try again.\n"
+            "Analysis features will be unavailable until the server connection is restored."
+        )
+        self.error_widget.setStyleSheet(f"""
+            QLabel {{
+                color: {theme_manager.get_colors()['text_secondary']};
+                font-size: 14pt;
+                padding: 40px;
+                background-color: {theme_manager.get_colors()['input_bg']};
+                border: 2px dashed {theme_manager.get_colors()['border']};
+                border-radius: 10px;
+                margin: 20px;
+            }}
+        """)
+        self.error_widget.show()

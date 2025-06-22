@@ -52,6 +52,13 @@ class AnalysisWidget(QWidget):
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         
+        # Error message widget (hidden by default)
+        self.error_widget = QLabel()
+        self.error_widget.setWordWrap(True)
+        self.error_widget.setAlignment(Qt.AlignCenter)
+        self.error_widget.hide()
+        layout.addWidget(self.error_widget)
+        
         # Main tab widget for different languages
         self.main_tab_widget = QTabWidget()
         
@@ -339,6 +346,9 @@ class AnalysisWidget(QWidget):
         # Server is working again - update availability status
         if not self.server_available:
             self.server_available = True
+            # Show analysis UI again
+            self.error_widget.hide()
+            self.main_tab_widget.show()
         
         # Display results based on analyzer type
         if result.analyzer_type == 'python':
@@ -527,15 +537,40 @@ class AnalysisWidget(QWidget):
             self.status_label.setText("Analysis server connected")
             # Reset status label style in case it was showing error
             self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
+            # Show analysis UI
+            self.error_widget.hide()
+            self.main_tab_widget.show()
             # Load hello world example
             self.analyze_hello_world_example()
         else:
             self.show_server_unavailable_message()
     
     def show_server_unavailable_message(self):
-        """Show server unavailable message in red"""
+        """Show server unavailable message and hide analysis UI"""
         self.status_label.setText("⚠️ Analysis server cannot be reached")
         self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        
+        # Hide the main analysis UI
+        self.main_tab_widget.hide()
+        
+        # Show error message
+        self.error_widget.setText(
+            "The analysis server is not available.\n\n"
+            "Please ensure the server is running and try again.\n"
+            "Analysis features will be unavailable until the server connection is restored."
+        )
+        self.error_widget.setStyleSheet(f"""
+            QLabel {{
+                color: {theme_manager.get_colors()['text_secondary']};
+                font-size: 14pt;
+                padding: 40px;
+                background-color: {theme_manager.get_colors()['input_bg']};
+                border: 2px dashed {theme_manager.get_colors()['border']};
+                border-radius: 10px;
+                margin: 20px;
+            }}
+        """)
+        self.error_widget.show()
     
     def analyze_hello_world_example(self):
         """Analyze a hello world Python example"""
