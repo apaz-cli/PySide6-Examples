@@ -59,6 +59,7 @@ class AnalysisWidget(QWidget):
         self.error_widget.setAlignment(Qt.AlignCenter)
         self.error_widget.hide()
         layout.addWidget(self.error_widget, 1)
+        layout.addStretch()
         
         # Main tab widget for different languages
         self.main_tab_widget = QTabWidget()
