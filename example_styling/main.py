@@ -10,6 +10,7 @@ from monaco_widget import MonacoEditorWidget
 from file_explorer import FileExplorer
 from sandbox import SandboxWidget
 from theme_manager import theme_manager
+from settings import settings_manager
 
 
 class TransparentWidget(QWidget):
@@ -75,7 +76,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PySide6 WebView Integration Example")
-        self.setGeometry(100, 100, 1000, 700)
+        
+        # Load settings first
+        self._load_settings()
         
         # Create custom central widget with background support
         self.central_widget = TransparentWidget()
@@ -125,9 +128,16 @@ class MainWindow(QMainWindow):
         self.opacity_slider = QSlider(Qt.Horizontal)
         self.opacity_slider.setMinimum(0)
         self.opacity_slider.setMaximum(100)
-        self.opacity_slider.setValue(70)
+        
+        # Load saved opacity or use default
+        saved_opacity = settings_manager.get("ui", "background_opacity", 0.7)
+        slider_value = int(saved_opacity * 100)
+        self.opacity_slider.setValue(slider_value)
         self.opacity_slider.valueChanged.connect(self.update_background_opacity)
-        self.opacity_label = QLabel("70%")
+        self.opacity_label = QLabel(f"{slider_value}%")
+        
+        # Set initial opacity
+        self.central_widget.set_background_opacity(saved_opacity)
         
         slider_layout.addWidget(self.slider_label)
         slider_layout.addWidget(self.opacity_slider)
@@ -179,6 +189,37 @@ class MainWindow(QMainWindow):
         
         # Apply initial theme
         self.apply_theme()
+        
+        # Load saved background image if any
+        self._load_background_image()
+    
+    def _load_settings(self):
+        """Load application settings"""
+        settings_manager.load_settings()
+        theme_manager.set_settings_manager(settings_manager)
+        
+        # Restore window geometry if saved
+        saved_geometry = settings_manager.get("ui", "window_geometry")
+        if saved_geometry:
+            self.setGeometry(*saved_geometry)
+        else:
+            self.setGeometry(100, 100, 1000, 700)
+    
+    def _load_background_image(self):
+        """Load saved background image"""
+        saved_bg = settings_manager.get("ui", "background_image")
+        if saved_bg and os.path.exists(saved_bg):
+            pixmap = QPixmap(saved_bg)
+            if not pixmap.isNull():
+                self.central_widget.set_background_image(pixmap)
+    
+    def _save_window_geometry(self):
+        """Save current window geometry"""
+        geometry = self.geometry()
+        settings_manager.set("ui", "window_geometry", [
+            geometry.x(), geometry.y(), geometry.width(), geometry.height()
+        ])
+        settings_manager.save_settings()
     
     def on_theme_changed(self, dark_mode):
         """Handle theme changes"""
@@ -259,17 +300,28 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(file_path)
             if not pixmap.isNull():
                 self.central_widget.set_background_image(pixmap)
+                # Save background image path
+                settings_manager.set("ui", "background_image", file_path)
+                settings_manager.save_settings()
     
     def clear_background(self):
         self.central_widget.set_background_image(None)
+        # Clear saved background image
+        settings_manager.set("ui", "background_image", None)
+        settings_manager.save_settings()
     
     def update_background_opacity(self, value):
         opacity = value / 100.0
         self.opacity_label.setText(f"{value}%")
         self.central_widget.set_background_opacity(opacity)
+        # Save opacity setting
+        settings_manager.set("ui", "background_opacity", opacity)
+        settings_manager.save_settings()
     
-    
-    
+    def closeEvent(self, event):
+        """Handle application close event"""
+        self._save_window_geometry()
+        super().closeEvent(event)
 
 
 def main():

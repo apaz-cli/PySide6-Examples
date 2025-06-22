@@ -20,6 +20,38 @@ class ThemeManager(QObject):
         self.dark_mode = self._detect_system_theme()
         self.current_font_family = 'lemon'
         self.current_font_size = 15.0
+        self._settings_manager = None
+    
+    def set_settings_manager(self, settings_manager):
+        """Set the settings manager for persistence"""
+        self._settings_manager = settings_manager
+        self._load_from_settings()
+    
+    def _load_from_settings(self):
+        """Load theme settings from settings manager"""
+        if self._settings_manager:
+            theme_settings = self._settings_manager.get_theme_settings()
+            
+            # Load dark mode (None means auto-detect)
+            saved_dark_mode = theme_settings.get("dark_mode")
+            if saved_dark_mode is not None:
+                self.dark_mode = saved_dark_mode
+            else:
+                self.dark_mode = self._detect_system_theme()
+            
+            # Load font settings
+            self.current_font_family = theme_settings.get("font_family", "lemon")
+            self.current_font_size = theme_settings.get("font_size", 15.0)
+    
+    def _save_to_settings(self):
+        """Save current theme settings"""
+        if self._settings_manager:
+            self._settings_manager.set_theme_settings(
+                self.dark_mode,
+                self.current_font_family,
+                self.current_font_size
+            )
+            self._settings_manager.save_settings()
     
     def _detect_system_theme(self):
         """Detect if the system is using dark theme"""
@@ -90,6 +122,7 @@ class ThemeManager(QObject):
         """Set dark mode state"""
         if self.dark_mode != enabled:
             self.dark_mode = enabled
+            self._save_to_settings()
             self.theme_changed.emit(self.dark_mode)
     
     def set_font(self, font_family, font_size=None):
@@ -100,6 +133,7 @@ class ThemeManager(QObject):
         if self.current_font_family != font_family or self.current_font_size != font_size:
             self.current_font_family = font_family
             self.current_font_size = font_size
+            self._save_to_settings()
             self.font_changed.emit(font_family, font_size)
             # Also emit theme changed to trigger style updates
             self.theme_changed.emit(self.dark_mode)
