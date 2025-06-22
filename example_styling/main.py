@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QFileSystemModel)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
+from monaco_widget import MonacoEditorWidget
 
 
 class TransparentWidget(QWidget):
@@ -263,10 +264,10 @@ class MainWindow(QMainWindow):
         explorer_layout.addWidget(self.selected_file_label)
         self.explorer_group.setLayout(explorer_layout)
         
-        # WebView section
-        self.webview_group = QGroupBox("Web Content")
-        self.webview_group.setObjectName("webview_group")
-        self.webview_group.setStyleSheet("""
+        # Monaco Editor section
+        self.editor_group = QGroupBox("Monaco Editor")
+        self.editor_group.setObjectName("editor_group")
+        self.editor_group.setStyleSheet("""
             QGroupBox {
                 background-color: rgba(255, 255, 255, 120);
                 border: 2px solid #27ae60;
@@ -281,18 +282,20 @@ class MainWindow(QMainWindow):
                 color: #2c3e50;
             }
         """)
-        webview_layout = QVBoxLayout()
+        editor_layout = QVBoxLayout()
         
-        self.webview = StyledWebView()
-        self.load_initial_content()
+        self.monaco_editor = MonacoEditorWidget()
+        self.monaco_editor.content_changed.connect(self.on_editor_content_changed)
+        self.monaco_editor.set_language("python")
+        self.monaco_editor.set_content("# Welcome to Monaco Editor\nprint('Hello World!')")
         
-        webview_layout.addWidget(self.webview)
-        self.webview_group.setLayout(webview_layout)
+        editor_layout.addWidget(self.monaco_editor)
+        self.editor_group.setLayout(editor_layout)
         
-        # Native Qt widget section
-        self.native_group = QGroupBox("Native Qt Widget")
-        self.native_group.setObjectName("native_group")
-        self.native_group.setStyleSheet("""
+        # Placeholder section
+        self.placeholder_group = QGroupBox("Placeholder Panel")
+        self.placeholder_group.setObjectName("placeholder_group")
+        self.placeholder_group.setStyleSheet("""
             QGroupBox {
                 background-color: rgba(255, 255, 255, 120);
                 border: 2px solid #e74c3c;
@@ -307,9 +310,9 @@ class MainWindow(QMainWindow):
                 color: #2c3e50;
             }
         """)
-        native_layout = QVBoxLayout()
+        placeholder_layout = QVBoxLayout()
         
-        info_label = QLabel("This is a native Qt widget area.\nNotice how the background image shows through both sections!")
+        info_label = QLabel("This is a placeholder panel.\nFuture functionality will be added here.")
         info_label.setWordWrap(True)
         self.info_label = info_label  # Store reference
         info_label.setStyleSheet("""
@@ -322,27 +325,29 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        self.text_edit = QTextEdit()
-        self.text_edit.setPlaceholderText("Type something here...")
-        self.text_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: rgba(255, 255, 255, 100);
-                border: 1px solid #bdc3c7;
+        placeholder_content = QLabel("Reserved for future features...")
+        placeholder_content.setAlignment(Qt.AlignCenter)
+        placeholder_content.setStyleSheet("""
+            QLabel {
+                color: #7f8c8d;
+                font-size: 12px;
+                font-style: italic;
+                padding: 20px;
+                background-color: rgba(255, 255, 255, 50);
+                border: 2px dashed #bdc3c7;
                 border-radius: 5px;
-                padding: 10px;
-                font-size: 13px;
-                color: #2c3e50;
             }
         """)
         
-        native_layout.addWidget(info_label)
-        native_layout.addWidget(self.text_edit)
-        self.native_group.setLayout(native_layout)
+        placeholder_layout.addWidget(info_label)
+        placeholder_layout.addWidget(placeholder_content)
+        placeholder_layout.addStretch()
+        self.placeholder_group.setLayout(placeholder_layout)
         
         # Add to content layout
         content_layout.addWidget(self.explorer_group, 1)
-        content_layout.addWidget(self.webview_group, 2)
-        content_layout.addWidget(self.native_group, 1)
+        content_layout.addWidget(self.editor_group, 2)
+        content_layout.addWidget(self.placeholder_group, 1)
         
         # Add all to main layout
         main_layout.addWidget(self.controls_group)
@@ -450,7 +455,7 @@ class MainWindow(QMainWindow):
                     color: #ecf0f1;
                 }
             """
-            group_style_webview = """
+            group_style_editor = """
                 QGroupBox {
                     background-color: rgba(44, 62, 80, 120);
                     border: 2px solid #2ecc71;
@@ -466,7 +471,7 @@ class MainWindow(QMainWindow):
                     color: #ecf0f1;
                 }
             """
-            group_style_native = """
+            group_style_placeholder = """
                 QGroupBox {
                     background-color: rgba(44, 62, 80, 120);
                     border: 2px solid #e74c3c;
@@ -489,16 +494,6 @@ class MainWindow(QMainWindow):
                     padding: 10px;
                     background-color: rgba(52, 73, 94, 80);
                     border-radius: 5px;
-                }
-            """
-            text_edit_style = """
-                QTextEdit {
-                    background-color: rgba(52, 73, 94, 100);
-                    border: 1px solid #7f8c8d;
-                    border-radius: 5px;
-                    padding: 10px;
-                    font-size: 13px;
-                    color: #ecf0f1;
                 }
             """
             slider_style = """
@@ -602,7 +597,7 @@ class MainWindow(QMainWindow):
                     color: #2c3e50;
                 }
             """
-            group_style_webview = """
+            group_style_editor = """
                 QGroupBox {
                     background-color: rgba(255, 255, 255, 120);
                     border: 2px solid #27ae60;
@@ -617,7 +612,7 @@ class MainWindow(QMainWindow):
                     color: #2c3e50;
                 }
             """
-            group_style_native = """
+            group_style_placeholder = """
                 QGroupBox {
                     background-color: rgba(255, 255, 255, 120);
                     border: 2px solid #e74c3c;
@@ -639,16 +634,6 @@ class MainWindow(QMainWindow):
                     padding: 10px;
                     background-color: rgba(255, 255, 255, 80);
                     border-radius: 5px;
-                }
-            """
-            text_edit_style = """
-                QTextEdit {
-                    background-color: rgba(255, 255, 255, 100);
-                    border: 1px solid #bdc3c7;
-                    border-radius: 5px;
-                    padding: 10px;
-                    font-size: 13px;
-                    color: #2c3e50;
                 }
             """
             slider_style = """
@@ -725,15 +710,14 @@ class MainWindow(QMainWindow):
         # Find and update all widgets
         self.controls_group.setStyleSheet(group_style_controls)
         self.explorer_group.setStyleSheet(group_style_explorer)
-        self.webview_group.setStyleSheet(group_style_webview)
-        self.native_group.setStyleSheet(group_style_native)
+        self.editor_group.setStyleSheet(group_style_editor)
+        self.placeholder_group.setStyleSheet(group_style_placeholder)
         
         # Update other widgets
         self.slider_label.setStyleSheet(slider_label_style)
         self.opacity_label.setStyleSheet(slider_label_style)
         self.info_label.setStyleSheet(label_style)
         
-        self.text_edit.setStyleSheet(text_edit_style)
         self.opacity_slider.setStyleSheet(slider_style)
         self.status_label.setStyleSheet(status_style)
         
@@ -742,8 +726,8 @@ class MainWindow(QMainWindow):
         self.file_tree.setStyleSheet(tree_style)
         self.selected_file_label.setStyleSheet(file_label_style)
         
-        # Update webview content with dark mode
-        self.apply_dark_mode_to_webview()
+        # Update Monaco editor theme
+        self.apply_dark_mode_to_editor()
     
     def change_directory(self, text):
         """Change the file explorer directory"""
@@ -772,77 +756,34 @@ class MainWindow(QMainWindow):
             
             self.selected_file_label.setText(f"Selected: {file_name}\nSize: {size_str}")
             
-            # If it's a text file, load it into the text editor
-            text_extensions = ['.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md']
+            # If it's a text file, load it into the Monaco editor
+            text_extensions = ['.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md', '.cpp', '.c', '.h', '.java']
             if any(file_name.lower().endswith(ext) for ext in text_extensions):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        if len(content) < 10000:  # Only load small files
-                            self.text_edit.setPlainText(content)
+                        if len(content) < 50000:  # Only load reasonably sized files
+                            self.monaco_editor.set_content(content)
+                            self.monaco_editor.detect_language_from_filename(file_name)
                         else:
-                            self.text_edit.setPlainText(f"File too large to display ({size_str})")
+                            self.monaco_editor.set_content(f"# File too large to display ({size_str})")
+                            self.monaco_editor.set_language("plaintext")
                 except Exception as e:
-                    self.text_edit.setPlainText(f"Error reading file: {str(e)}")
+                    self.monaco_editor.set_content(f"# Error reading file: {str(e)}")
+                    self.monaco_editor.set_language("plaintext")
         else:
             self.selected_file_label.setText(f"Directory: {file_info.fileName()}")
 
-    def apply_dark_mode_to_webview(self):
+    def apply_dark_mode_to_editor(self):
         if self.dark_mode:
-            dark_css = """
-                body { 
-                    background-color: transparent !important; 
-                    color: #ecf0f1 !important;
-                }
-                .container, .card { 
-                    background-color: rgba(44, 62, 80, 0.6) !important;
-                    color: #ecf0f1 !important;
-                }
-                h1, h2 { 
-                    color: #3498db !important; 
-                }
-                .highlight { 
-                    background-color: rgba(52, 152, 219, 0.3) !important; 
-                }
-                button {
-                    background-color: #2ecc71 !important;
-                    color: white !important;
-                    border: 1px solid #27ae60 !important;
-                }
-                button:hover {
-                    background-color: #27ae60 !important;
-                }
-                input[type="text"] {
-                    background-color: rgba(52, 73, 94, 0.5) !important;
-                    color: #ecf0f1 !important;
-                    border-color: #7f8c8d !important;
-                }
-                .progress-bar {
-                    background-color: rgba(127, 140, 141, 0.5) !important;
-                }
-                p {
-                    color: #ecf0f1 !important;
-                }
-            """
+            self.monaco_editor.set_theme('vs-dark')
         else:
-            dark_css = """
-                /* Reset to light mode by removing dark mode overrides */
-                body { background-color: transparent !important; }
-            """
-        
-        # Inject CSS into the webview
-        script = f"""
-            (function() {{
-                var style = document.getElementById('dark-mode-style');
-                if (!style) {{
-                    style = document.createElement('style');
-                    style.id = 'dark-mode-style';
-                    document.head.appendChild(style);
-                }}
-                style.textContent = `{dark_css}`;
-            }})();
-        """
-        self.webview.page().runJavaScript(script)
+            self.monaco_editor.set_theme('vs')
+    
+    def on_editor_content_changed(self, content):
+        """Handle Monaco editor content changes"""
+        # You can add logic here to respond to editor changes
+        pass
     
     def load_background(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -867,158 +808,55 @@ class MainWindow(QMainWindow):
         self.opacity_label.setText(f"{value}%")
         self.central_widget.set_background_opacity(opacity)
     
-    def load_initial_content(self):
-        html_content = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                    background-color: transparent;
-                    color: #2c3e50;
-                }
-                .container {
-                    background-color: rgba(255, 255, 255, 0.6);
-                    padding: 20px;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }
-                h1 {
-                    color: #27ae60;
-                    text-align: center;
-                }
-                p {
-                    line-height: 1.6;
-                }
-                .highlight {
-                    background-color: rgba(46, 204, 113, 0.3);
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>WebView Content</h1>
-                <p>This is content rendered in a <span class="highlight">QWebEngineView</span>.</p>
-                <p>Notice how the background image shows through the semi-transparent areas!</p>
-                <p>The styling is designed to complement the native Qt widgets.</p>
-            </div>
-        </body>
-        </html>
-        """
-        self.webview.setHtml(html_content)
-        # Apply dark mode if active
-        if self.dark_mode:
-            # Small delay to ensure content is loaded
-            QTimer.singleShot(100, self.apply_dark_mode_to_webview)
     
     def load_demo_content(self):
-        html_content = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                    background-color: transparent;
-                    color: #2c3e50;
-                }
-                .card {
-                    background-color: rgba(255, 255, 255, 0.65);
-                    padding: 20px;
-                    margin: 10px 0;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                    transition: transform 0.2s;
-                }
-                .card:hover {
-                    transform: translateY(-5px);
-                }
-                h2 {
-                    color: #4a90e2;
-                    margin-top: 0;
-                }
-                button {
-                    background-color: #27ae60;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    margin: 5px;
-                }
-                button:hover {
-                    background-color: #229954;
-                }
-                .progress-bar {
-                    width: 100%;
-                    height: 20px;
-                    background-color: rgba(189, 195, 199, 0.5);
-                    border-radius: 10px;
-                    overflow: hidden;
-                    margin: 10px 0;
-                }
-                .progress-fill {
-                    height: 100%;
-                    background-color: #3498db;
-                    width: 75%;
-                    transition: width 0.3s;
-                }
-                input[type="text"] {
-                    padding: 8px;
-                    border: 1px solid #bdc3c7;
-                    border-radius: 5px;
-                    margin: 5px;
-                    background-color: rgba(255, 255, 255, 0.5);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h2>Interactive Demo</h2>
-                <p>This demonstrates more complex web content with interactivity.</p>
-                <button onclick="alert('Hello from WebView!')">Click Me!</button>
-                <button onclick="changeProgress()">Change Progress</button>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress"></div>
-                </div>
-                <input type="text" placeholder="Type here to test transparency" style="width: 90%;">
-            </div>
-            
-            <div class="card">
-                <h2>Transparent Integration</h2>
-                <p>The semi-transparent cards let the background show through,
-                creating a unified look between web and native content.</p>
-                <p style="background-color: rgba(52, 152, 219, 0.2); padding: 10px; border-radius: 5px;">
-                    This paragraph has a semi-transparent blue background!
-                </p>
-            </div>
-            
-            <script>
-                function changeProgress() {
-                    const progress = document.getElementById('progress');
-                    const random = Math.floor(Math.random() * 100);
-                    progress.style.width = random + '%';
-                }
-            </script>
-        </body>
-        </html>
-        """
-        self.webview.setHtml(html_content)
-        # Apply dark mode if active
-        if self.dark_mode:
-            QTimer.singleShot(100, self.apply_dark_mode_to_webview)
+        demo_content = '''# Monaco Editor Demo
+# This is a demonstration of the Monaco Editor integration
+
+def fibonacci(n):
+    """Calculate the nth Fibonacci number"""
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+# Example usage
+for i in range(10):
+    print(f"F({i}) = {fibonacci(i)}")
+
+# Try editing this code!
+# The editor supports:
+# - Syntax highlighting
+# - Code completion
+# - Error detection
+# - Multiple languages
+
+class Calculator:
+    def __init__(self):
+        self.result = 0
+    
+    def add(self, value):
+        self.result += value
+        return self
+    
+    def multiply(self, value):
+        self.result *= value
+        return self
+    
+    def get_result(self):
+        return self.result
+
+# Method chaining example
+calc = Calculator()
+result = calc.add(5).multiply(3).add(2).get_result()
+print(f"Result: {result}")
+'''
+        self.monaco_editor.set_content(demo_content)
+        self.monaco_editor.set_language("python")
     
     def refresh_webview(self):
-        self.webview.reload()
-        # Reapply dark mode after reload
-        if self.dark_mode:
-            QTimer.singleShot(500, self.apply_dark_mode_to_webview)
+        # Reset Monaco editor to initial content
+        self.monaco_editor.set_content("# Welcome to Monaco Editor\nprint('Hello World!')")
+        self.monaco_editor.set_language("python")
 
 
 def main():
