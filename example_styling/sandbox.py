@@ -467,14 +467,27 @@ class SandboxWidget(QWidget):
         # Make jump targets clickable
         elif instruction.instruction_type.name == 'JUMP':
             import re
-            target_match = re.search(r'(\d+)', instruction.argrepr)
-            if target_match:
-                target_offset = target_match.group(1)
-                if int(target_offset) in analysis.jump_targets:
-                    argrepr_text = argrepr_text.replace(
-                        target_offset,
-                        f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
-                    )
+            # Handle both "to 92" format and standalone numbers
+            if 'to ' in instruction.argrepr:
+                # Match "(to 92)" pattern
+                target_match = re.search(r'\(to (\d+)\)', instruction.argrepr)
+                if target_match:
+                    target_offset = target_match.group(1)
+                    if int(target_offset) in analysis.jump_targets:
+                        argrepr_text = argrepr_text.replace(
+                            f'to {target_offset}',
+                            f'to <a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
+                        )
+            else:
+                # Fallback for other jump formats
+                target_match = re.search(r'(\d+)', instruction.argrepr)
+                if target_match:
+                    target_offset = target_match.group(1)
+                    if int(target_offset) in analysis.jump_targets:
+                        argrepr_text = argrepr_text.replace(
+                            target_offset,
+                            f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
+                        )
         
         # Make function calls clickable
         elif instruction.instruction_type.name == 'CALL' and instruction.argval:
