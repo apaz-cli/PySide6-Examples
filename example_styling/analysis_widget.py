@@ -365,398 +365,79 @@ class AnalysisWidget(QWidget):
         
         return html
     
+    # Use sandbox implementation for bytecode display methods
     def _build_function_overview(self, analysis, type_colors):
-        """Build function overview section"""
-        colors = theme_manager.get_colors()
-        
-        overview = [f'<div style="margin-bottom: 20px; padding: 10px; background-color: {colors["background"].replace("120", "40")}; border-radius: 5px;">']
-        overview.append(f'<h3 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">📋 Functions Overview</h3>')
-        
-        for func in analysis.functions:
-            func_name = func.name if func.name != "<module>" else "Main Module"
-            overview.append(f'''
-            <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
-                <a href="#func_{func.name}" style="color: {type_colors["CALL"]}; text-decoration: none; font-weight: bold;">
-                    {func_name}
-                </a>
-                <span style="color: {colors["text_secondary"]}; margin-left: 10px;">
-                    Args: {func.argcount}, Locals: {len(func.varnames)}
-                </span>
-            </div>
-            ''')
-        
-        overview.append('</div>')
-        return ''.join(overview)
+        """Build function overview section - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._build_function_overview(analysis, type_colors)
     
     def _build_variable_listings(self, analysis, type_colors):
-        """Build variable listings for each function"""
-        colors = theme_manager.get_colors()
-        
-        listings = []
-        
-        for func in analysis.functions:
-            func_name = func.name if func.name != "<module>" else "Main Module"
-            
-            listings.append(f'''
-            <div style="margin-bottom: 15px; padding: 10px; background-color: {colors["background"].replace("120", "30")}; border-radius: 5px;">
-                <a name="func_{func.name}"></a>
-                <h4 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">{func_name}</h4>
-            ''')
-            
-            # Local variables only
-            if func.varnames:
-                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["LOAD"]};">Variables:</strong><br>')
-                for i, var in enumerate(func.varnames):
-                    listings.append(f'''
-                    <a name="var_{var}_{func.name}"></a>
-                    <a href="#var_usage_{var}" style="color: {type_colors["LOAD"]}; text-decoration: none; margin-right: 10px;" 
-                       title="Find all uses of {var}">{var}</a>
-                    ''')
-                listings.append('</div>')
-            
-            listings.append('</div>')
-        
-        return ''.join(listings)
+        """Build variable listings for each function - delegate to sandbox"""
+        # Simplified version for analysis widget
+        return ""  # Skip variable listings in analysis widget
     
     def _build_enhanced_disassembly(self, analysis, type_colors):
-        """Build enhanced disassembly section modeled after dis.dis()"""
-        colors = theme_manager.get_colors()
-        
-        disasm = [f'''
-        <div style="margin-top: 20px;">
-            <h3 style="color: {colors["text"]}; margin: 0 0 15px 0;">⚙️ Disassembly</h3>
-        ''']
-        
-        current_function = None
-        
-        for func in analysis.functions:
-            # Function header
-            func_name = func.name if func.name != "<module>" else "Main Module"
-            disasm.append(f'''
-            <div style="margin: 15px 0 10px 0; padding: 8px; background-color: {colors["hover"]}; border-radius: 5px;">
-                <a name="disasm_{func.name}"></a>
-                <strong style="color: {type_colors["CALL"]};">Disassembly of {func_name}:</strong>
-            </div>
-            ''')
-            
-            # Instructions for this function
-            for instruction in func.instructions:
-                line_html = self._format_instruction_line(instruction, analysis, type_colors)
-                disasm.append(line_html)
-        
-        disasm.append('</div>')
-        return ''.join(disasm)
+        """Build enhanced disassembly section - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._build_enhanced_disassembly(analysis, type_colors)
     
     def _format_instruction_line(self, instruction, analysis, type_colors):
-        """Format a single instruction line with enhanced features"""
-        colors = theme_manager.get_colors()
-        
-        # Create anchor for this instruction
-        anchor = f'<a name="instr_{instruction.offset}"></a>'
-        
-        # Jump target marker
-        target_marker = "&gt;&gt;" if instruction.is_jump_target else "&nbsp;&nbsp;"
-        if instruction.is_jump_target:
-            anchor += f'<a name="offset_{instruction.offset}"></a>'
-        
-        # Line number
-        line_info = f"({instruction.line_number:3d})" if instruction.line_number else "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-        
-        # Instruction color
-        instr_color = type_colors.get(instruction.instruction_type.name, type_colors['OTHER'])
-        
-        # Format instruction parts
-        offset_part = f'<span style="color: {colors["text_secondary"]};">{instruction.offset:4d}</span>'
-        opname_part = f'<span style="color: {instr_color}; font-weight: bold;">{instruction.opname}</span>'
-        
-        # Argument and representation with enhanced linking
-        arg_part = ""
-        if instruction.arg is not None:
-            arg_part = f'<span style="color: {colors["text"]};">{instruction.arg:4d}</span>'
-        
-        argrepr_part = ""
-        if instruction.argrepr:
-            argrepr_text = self._enhance_argrepr_links(instruction, analysis, instr_color)
-            argrepr_part = f'<span style="color: {colors["text"]};">({argrepr_text})</span>'
-        
-        # Combine parts
-        line_content = f"{target_marker} {line_info} {offset_part} {opname_part:<20}"
-        if arg_part:
-            line_content += f" {arg_part}"
-        if argrepr_part:
-            line_content += f" {argrepr_part}"
-        
-        # Add hover tooltip
-        tooltip = self._create_enhanced_tooltip(instruction, analysis)
-        
-        # Highlight jump targets
-        line_style = ""
-        if instruction.is_jump_target:
-            line_style = f'background-color: {colors["hover"]}; padding: 2px; border-radius: 3px;'
-        
-        return f'<div style="{line_style}" title="{tooltip}">{anchor}{line_content}</div>'
+        """Format instruction line - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._format_instruction_line(instruction, analysis, type_colors)
     
     def _enhance_argrepr_links(self, instruction, analysis, instr_color):
-        """Enhance argrepr with clickable links for variables and functions"""
-        argrepr_text = instruction.argrepr
-        
-        # Make variable names clickable
-        if instruction.instruction_type.name in ['LOAD', 'STORE'] and instruction.argval:
-            var_name = instruction.argval
-            # Find which function this variable belongs to
-            func_context = self._find_variable_context(var_name, analysis)
-            if func_context:
-                argrepr_text = argrepr_text.replace(
-                    var_name,
-                    f'<a href="#var_{var_name}_{func_context}" style="color: {instr_color}; text-decoration: underline;" title="Go to {var_name} definition in {func_context}">{var_name}</a>'
-                )
-        
-        # Make jump targets clickable
-        elif instruction.instruction_type.name == 'JUMP':
-            import re
-            # Handle both "to 92" format and standalone numbers
-            if 'to ' in instruction.argrepr:
-                # Match "(to 92)" pattern
-                target_match = re.search(r'\(to (\d+)\)', instruction.argrepr)
-                if target_match:
-                    target_offset = target_match.group(1)
-                    if int(target_offset) in analysis.jump_targets:
-                        argrepr_text = argrepr_text.replace(
-                            f'to {target_offset}',
-                            f'to <a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
-                        )
-            else:
-                # Fallback for other jump formats
-                target_match = re.search(r'(\d+)', instruction.argrepr)
-                if target_match:
-                    target_offset = target_match.group(1)
-                    if int(target_offset) in analysis.jump_targets:
-                        argrepr_text = argrepr_text.replace(
-                            target_offset,
-                            f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
-                        )
-        
-        # Make function calls clickable
-        elif instruction.instruction_type.name == 'CALL' and instruction.argval:
-            func_name = instruction.argval
-            # Check if this function is defined in our analysis
-            for func in analysis.functions:
-                if func.name == func_name:
-                    argrepr_text = argrepr_text.replace(
-                        func_name,
-                        f'<a href="#func_{func_name}" style="color: {instr_color}; text-decoration: underline;" title="Go to {func_name} definition">{func_name}</a>'
-                    )
-                    break
-            else:
-                # External function call
-                argrepr_text = argrepr_text.replace(
-                    func_name,
-                    f'<a href="#call_{func_name}" style="color: {instr_color}; text-decoration: underline;" title="Find all calls to {func_name}">{func_name}</a>'
-                )
-        
-        return argrepr_text
+        """Enhance argrepr links - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._enhance_argrepr_links(instruction, analysis, instr_color)
     
     def _find_variable_context(self, var_name, analysis):
-        """Find which function a variable belongs to"""
-        for func in analysis.functions:
-            if var_name in func.varnames or var_name in func.freevars or var_name in func.cellvars:
-                return func.name
-        return None
+        """Find variable context - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._find_variable_context(var_name, analysis)
     
     def _create_enhanced_tooltip(self, instruction, analysis):
-        """Create enhanced tooltip with context information"""
-        tooltip_parts = [
-            f"Offset: {instruction.offset}",
-            f"Opcode: {instruction.opname}",
-            f"Type: {instruction.instruction_type.value.title()}"
-        ]
-        
-        if instruction.line_number:
-            tooltip_parts.append(f"Source Line: {instruction.line_number}")
-        
-        if instruction.arg is not None:
-            tooltip_parts.append(f"Argument: {instruction.arg}")
-        
-        if instruction.argval:
-            tooltip_parts.append(f"Value: {instruction.argval}")
-            
-            # Add context for variables
-            if instruction.instruction_type.name in ['LOAD', 'STORE']:
-                context = self._find_variable_context(instruction.argval, analysis)
-                if context:
-                    tooltip_parts.append(f"Context: {context}")
-        
-        if instruction.is_jump_target:
-            tooltip_parts.append("🎯 Jump Target")
-        
-        return " | ".join(tooltip_parts)
-    
-    def _build_navigation_links(self, analysis, type_colors):
-        """Build navigation links section"""
-        colors = theme_manager.get_colors()
-        links = []
-        
-        # Quick stats
-        stats = f'''
-        <div style="margin-bottom: 10px; padding: 8px; background-color: {colors['background'].replace('120', '60')}; border-radius: 5px;">
-            <strong>📊 Quick Stats:</strong> 
-            {len(analysis.instructions)} instructions, 
-            {len(analysis.jump_targets)} jump targets, 
-            {len(analysis.local_vars)} locals, 
-            {len(analysis.global_vars)} globals
-        </div>
-        '''
-        links.append(stats)
-        
-        # Jump targets
-        if analysis.jump_targets:
-            jump_links = []
-            for target in sorted(analysis.jump_targets):
-                jump_links.append(f'<a href="#offset_{target}" style="color: {type_colors["JUMP"]}; text-decoration: none; margin-right: 8px;" title="Jump to offset {target}">@{target}</a>')
-            
-            jumps_section = f'''
-            <div style="margin-bottom: 8px;">
-                <strong style="color: {type_colors['JUMP']};">🔀 Jump Targets:</strong> 
-                {' '.join(jump_links)}
-            </div>
-            '''
-            links.append(jumps_section)
-        
-        # Variables
-        if analysis.local_vars or analysis.global_vars:
-            var_links = []
-            
-            for var in sorted(analysis.local_vars):
-                var_links.append(f'<a href="#var_{var}" style="color: {type_colors["LOAD"]}; text-decoration: none; margin-right: 8px;" title="Find uses of local variable {var}">🔵{var}</a>')
-            
-            for var in sorted(analysis.global_vars):
-                var_links.append(f'<a href="#var_{var}" style="color: {type_colors["STORE"]}; text-decoration: none; margin-right: 8px;" title="Find uses of global variable {var}">🔴{var}</a>')
-            
-            if var_links:
-                vars_section = f'''
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: {colors['text']};">📦 Variables:</strong> 
-                    {' '.join(var_links)}
-                </div>
-                '''
-                links.append(vars_section)
-        
-        # Function calls
-        unique_calls = list(set(analysis.function_calls))
-        if unique_calls:
-            call_links = []
-            for call in sorted(unique_calls)[:10]:  # Limit to first 10
-                call_links.append(f'<a href="#call_{call}" style="color: {type_colors["CALL"]}; text-decoration: none; margin-right: 8px;" title="Find calls to {call}">📞{call}</a>')
-            
-            calls_section = f'''
-            <div style="margin-bottom: 8px;">
-                <strong style="color: {type_colors['CALL']};">📞 Function Calls:</strong> 
-                {' '.join(call_links)}
-            </div>
-            '''
-            links.append(calls_section)
-        
-        return ''.join(links)
-    
-    def _create_instruction_tooltip(self, instruction):
-        """Create tooltip text for an instruction"""
-        tooltip_parts = [
-            f"Offset: {instruction.offset}",
-            f"Opcode: {instruction.opname}",
-            f"Type: {instruction.instruction_type.value.title()}"
-        ]
-        
-        if instruction.line_number:
-            tooltip_parts.append(f"Source Line: {instruction.line_number}")
-        
-        if instruction.arg is not None:
-            tooltip_parts.append(f"Argument: {instruction.arg}")
-        
-        if instruction.argval:
-            tooltip_parts.append(f"Value: {instruction.argval}")
-        
-        if instruction.is_jump_target:
-            tooltip_parts.append("🎯 Jump Target")
-        
-        return " | ".join(tooltip_parts)
+        """Create enhanced tooltip - delegate to sandbox"""
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        return sandbox_widget._create_enhanced_tooltip(instruction, analysis)
     
     def handle_bytecode_link(self, url):
         """Handle clicking on bytecode navigation links"""
+        # Delegate to sandbox widget's implementation
+        from sandbox import SandboxWidget
+        sandbox_widget = SandboxWidget()
+        sandbox_widget.bytecode_analysis = self.bytecode_analysis
+        sandbox_widget.dis_text = self.dis_text
+        
+        # Use the sandbox implementation
         url_str = url.toString()
         
         if url_str.startswith('#offset_'):
-            # Jump to specific offset
-            self._scroll_to_anchor(url_str)
-        
+            sandbox_widget._scroll_to_anchor(url_str)
         elif url_str.startswith('#var_'):
-            # Handle variable links (could be var_name or var_name_function)
-            if '_' in url_str[5:]:  # var_name_function format
-                self._scroll_to_anchor(url_str)
+            if '_' in url_str[5:]:
+                sandbox_widget._scroll_to_anchor(url_str)
             else:
-                var_name = url_str[5:]  # Remove '#var_'
-                self._highlight_variable_uses(var_name)
-        
+                var_name = url_str[5:]
+                sandbox_widget._highlight_variable_uses(var_name)
         elif url_str.startswith('#func_'):
-            # Jump to function definition
-            self._scroll_to_anchor(url_str)
-        
+            sandbox_widget._scroll_to_anchor(url_str)
         elif url_str.startswith('#call_'):
-            # Highlight all calls to a function
-            func_name = url_str[6:]  # Remove '#call_'
-            self._highlight_function_calls(func_name)
-        
+            func_name = url_str[6:]
+            sandbox_widget._highlight_function_calls(func_name)
         elif url_str.startswith('#instr_'):
-            # Jump to specific instruction
-            self._scroll_to_anchor(url_str)
-        
+            sandbox_widget._scroll_to_anchor(url_str)
         elif url_str.startswith('#var_usage_'):
-            # Highlight all uses of a variable across functions
-            var_name = url_str[11:]  # Remove '#var_usage_'
-            self._highlight_variable_uses(var_name)
-        
+            var_name = url_str[11:]
+            sandbox_widget._highlight_variable_uses(var_name)
         elif url_str.startswith('#disasm_'):
-            # Jump to function disassembly
-            self._scroll_to_anchor(url_str)
-    
-    def _scroll_to_anchor(self, anchor):
-        """Scroll to a specific anchor in the text"""
-        cursor = self.dis_text.textCursor()
-        cursor.movePosition(cursor.MoveOperation.Start)
-        
-        if self.dis_text.find(anchor.replace('#', '')):
-            self.dis_text.ensureCursorVisible()
-    
-    def _highlight_variable_uses(self, var_name):
-        """Highlight all uses of a variable"""
-        if not self.bytecode_analysis:
-            return
-        
-        # Find all instructions that use this variable
-        matching_instructions = []
-        for i, instr in enumerate(self.bytecode_analysis.instructions):
-            if (instr.argval == var_name and 
-                instr.instruction_type.name in ['LOAD', 'STORE']):
-                matching_instructions.append(i)
-        
-        # Scroll to first occurrence
-        if matching_instructions:
-            self._scroll_to_anchor(f'#instr_{matching_instructions[0]}')
-    
-    def _highlight_function_calls(self, func_name):
-        """Highlight all calls to a function"""
-        if not self.bytecode_analysis:
-            return
-        
-        # Find all call instructions for this function
-        matching_instructions = []
-        for i, instr in enumerate(self.bytecode_analysis.instructions):
-            if (instr.argval == func_name and 
-                instr.instruction_type.name == 'CALL'):
-                matching_instructions.append(i)
-        
-        # Scroll to first occurrence
-        if matching_instructions:
-            self._scroll_to_anchor(f'#instr_{matching_instructions[0]}')
+            sandbox_widget._scroll_to_anchor(url_str)
     
     def apply_theme(self):
         """Apply current theme to the widget"""
