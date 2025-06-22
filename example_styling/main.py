@@ -8,7 +8,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 from monaco_widget import MonacoEditorWidget
 from file_explorer import FileExplorer
-from sandbox import SandboxWidget
+from analysis_widget import AnalysisWidget
 from theme_manager import theme_manager
 from settings import settings_manager
 
@@ -169,13 +169,13 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self.monaco_editor)
         self.editor_group.setLayout(editor_layout)
         
-        # Python Analysis section
-        self.analysis_group = QGroupBox("Python Analysis")
+        # Analysis section
+        self.analysis_group = QGroupBox("Analysis")
         self.analysis_group.setObjectName("analysis_group")
         analysis_layout = QVBoxLayout()
         
-        self.sandbox_widget = SandboxWidget()
-        analysis_layout.addWidget(self.sandbox_widget)
+        self.analysis_widget = AnalysisWidget()
+        analysis_layout.addWidget(self.analysis_widget)
         self.analysis_group.setLayout(analysis_layout)
         
         # Add to content layout
@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
     
     def on_file_selected(self, file_path):
         """Handle file selection for analysis"""
-        self.sandbox_widget.analyze_file(file_path)
+        self.analysis_widget.analyze_file(file_path)
     
     def select_font(self):
         """Open font selection dialog"""
