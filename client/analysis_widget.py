@@ -50,6 +50,7 @@ class AnalysisWidget(QWidget):
         # Status label
         self.status_label = QLabel("Checking analysis server...")
         self.status_label.setWordWrap(True)
+        self.status_label.setMaximumHeight(30)
         layout.addWidget(self.status_label)
         
         # Error message widget (hidden by default)
@@ -57,7 +58,7 @@ class AnalysisWidget(QWidget):
         self.error_widget.setWordWrap(True)
         self.error_widget.setAlignment(Qt.AlignCenter)
         self.error_widget.hide()
-        layout.addWidget(self.error_widget)
+        layout.addWidget(self.error_widget, 1)
         
         # Main tab widget for different languages
         self.main_tab_widget = QTabWidget()
@@ -562,12 +563,13 @@ class AnalysisWidget(QWidget):
         self.error_widget.setStyleSheet(f"""
             QLabel {{
                 color: {theme_manager.get_colors()['text_secondary']};
-                font-size: 14pt;
-                padding: 40px;
+                font-size: 12pt;
+                padding: 30px;
                 background-color: {theme_manager.get_colors()['input_bg']};
                 border: 2px dashed {theme_manager.get_colors()['border']};
-                border-radius: 10px;
-                margin: 20px;
+                border-radius: 8px;
+                margin: 10px;
+                max-height: 200px;
             }}
         """)
         self.error_widget.show()
