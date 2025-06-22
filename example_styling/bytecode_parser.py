@@ -259,7 +259,7 @@ class BytecodeParser:
             main_function=main_function
         )
     
-    def _analyze_single_function(self, code_obj, name: str, offset_base: int, function_object: Any = None) -> FunctionInfo:
+    def _analyze_single_function(self, code_obj, name: str, offset_base: int, function_object: Any) -> FunctionInfo:
         """Analyze a single function's code object"""
         instructions = []
         
