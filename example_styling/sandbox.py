@@ -501,7 +501,7 @@ class SandboxWidget(QWidget):
                 <a href="#func_{func.name}" style="color: {type_colors["CALL"]}; text-decoration: none; font-weight: bold;">
                     {func_name}
                 </a>
-                <span style="color: {colors["text_secondary"]}; margin-left: 10px; font-family: monospace;">
+                <span style="color: {colors["text_secondary"]}; font-family: monospace;">
                     {signature}
                 </span>
             </div>
@@ -661,15 +661,9 @@ class SandboxWidget(QWidget):
             return "(module)"
         
         # Use inspect.signature() if we have the function object
-        if hasattr(self.analyzer, 'function_objects') and func.name in self.analyzer.function_objects:
-            try:
-                func_obj = self.analyzer.function_objects[func.name]
-                sig = inspect.signature(func_obj)
-                return str(sig)
-            except Exception:
-                return "(signature unavailable)"
-        
-        return "(signature unavailable)"
+        func_obj = self.analyzer.function_objects[func.name]
+        sig = inspect.signature(func_obj)
+        return str(sig)
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
