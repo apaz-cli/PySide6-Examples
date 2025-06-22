@@ -1,11 +1,11 @@
 import sys
 import os
-from PySide6.QtCore import Qt, QUrl, QTimer
+from PySide6.QtCore import Qt, QUrl, QTimer, QDir, QFileInfo
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QLabel, QTextEdit,
-                               QGroupBox, QSlider, QFileDialog)
+                               QGroupBox, QSlider, QFileDialog, QTreeView, QComboBox)
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
+from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor, QFileSystemModel
 
 
 class TransparentWidget(QWidget):
@@ -165,8 +165,101 @@ class MainWindow(QMainWindow):
         controls_layout.addLayout(slider_layout)
         self.controls_group.setLayout(controls_layout)
         
-        # Content area with webview and native widget
+        # Content area with file explorer, webview and native widget
         content_layout = QHBoxLayout()
+        
+        # File Explorer section
+        self.explorer_group = QGroupBox("File Explorer")
+        self.explorer_group.setObjectName("explorer_group")
+        self.explorer_group.setStyleSheet("""
+            QGroupBox {
+                background-color: rgba(255, 255, 255, 120);
+                border: 2px solid #9b59b6;
+                border-radius: 10px;
+                padding-top: 20px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                padding: 0 10px;
+                color: #2c3e50;
+            }
+        """)
+        explorer_layout = QVBoxLayout()
+        
+        # Directory dropdown
+        self.dir_combo = QComboBox()
+        self.dir_combo.addItem("Current Directory", os.getcwd())
+        self.dir_combo.addItem("Home Directory", os.path.expanduser("~"))
+        self.dir_combo.addItem("Root Directory", "/")
+        self.dir_combo.currentTextChanged.connect(self.change_directory)
+        self.dir_combo.setStyleSheet("""
+            QComboBox {
+                background-color: rgba(255, 255, 255, 100);
+                border: 1px solid #bdc3c7;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 12px;
+                color: #2c3e50;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                width: 12px;
+                height: 12px;
+            }
+        """)
+        
+        # File tree view
+        self.file_model = QFileSystemModel()
+        self.file_model.setRootPath(os.getcwd())
+        self.file_tree = QTreeView()
+        self.file_tree.setModel(self.file_model)
+        self.file_tree.setRootIndex(self.file_model.index(os.getcwd()))
+        self.file_tree.setColumnWidth(0, 200)
+        self.file_tree.hideColumn(1)  # Hide size column
+        self.file_tree.hideColumn(2)  # Hide type column
+        self.file_tree.hideColumn(3)  # Hide date column
+        self.file_tree.clicked.connect(self.file_selected)
+        self.file_tree.setStyleSheet("""
+            QTreeView {
+                background-color: rgba(255, 255, 255, 80);
+                border: 1px solid #bdc3c7;
+                border-radius: 5px;
+                font-size: 12px;
+                color: #2c3e50;
+            }
+            QTreeView::item {
+                padding: 2px;
+            }
+            QTreeView::item:selected {
+                background-color: rgba(74, 144, 226, 0.3);
+            }
+            QTreeView::item:hover {
+                background-color: rgba(74, 144, 226, 0.1);
+            }
+        """)
+        
+        # Selected file label
+        self.selected_file_label = QLabel("No file selected")
+        self.selected_file_label.setWordWrap(True)
+        self.selected_file_label.setStyleSheet("""
+            QLabel {
+                color: #2c3e50;
+                font-size: 11px;
+                padding: 5px;
+                background-color: rgba(255, 255, 255, 60);
+                border-radius: 3px;
+            }
+        """)
+        
+        explorer_layout.addWidget(QLabel("Directory:"))
+        explorer_layout.addWidget(self.dir_combo)
+        explorer_layout.addWidget(self.file_tree)
+        explorer_layout.addWidget(self.selected_file_label)
+        self.explorer_group.setLayout(explorer_layout)
         
         # WebView section
         self.webview_group = QGroupBox("Web Content")
@@ -245,6 +338,7 @@ class MainWindow(QMainWindow):
         self.native_group.setLayout(native_layout)
         
         # Add to content layout
+        content_layout.addWidget(self.explorer_group, 1)
         content_layout.addWidget(self.webview_group, 2)
         content_layout.addWidget(self.native_group, 1)
         
@@ -338,6 +432,22 @@ class MainWindow(QMainWindow):
                     color: #ecf0f1;
                 }
             """
+            group_style_explorer = """
+                QGroupBox {
+                    background-color: rgba(44, 62, 80, 120);
+                    border: 2px solid #9b59b6;
+                    border-radius: 10px;
+                    padding-top: 20px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #ecf0f1;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    padding: 0 10px;
+                    color: #ecf0f1;
+                }
+            """
             group_style_webview = """
                 QGroupBox {
                     background-color: rgba(44, 62, 80, 120);
@@ -412,11 +522,73 @@ class MainWindow(QMainWindow):
                 }
             """
             slider_label_style = "color: #ecf0f1; font-weight: bold;"
+            
+            combo_style = """
+                QComboBox {
+                    background-color: rgba(52, 73, 94, 100);
+                    border: 1px solid #7f8c8d;
+                    border-radius: 5px;
+                    padding: 5px;
+                    font-size: 12px;
+                    color: #ecf0f1;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                }
+                QComboBox::down-arrow {
+                    width: 12px;
+                    height: 12px;
+                }
+            """
+            
+            tree_style = """
+                QTreeView {
+                    background-color: rgba(52, 73, 94, 80);
+                    border: 1px solid #7f8c8d;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    color: #ecf0f1;
+                }
+                QTreeView::item {
+                    padding: 2px;
+                }
+                QTreeView::item:selected {
+                    background-color: rgba(52, 152, 219, 0.3);
+                }
+                QTreeView::item:hover {
+                    background-color: rgba(52, 152, 219, 0.1);
+                }
+            """
+            
+            file_label_style = """
+                QLabel {
+                    color: #ecf0f1;
+                    font-size: 11px;
+                    padding: 5px;
+                    background-color: rgba(44, 62, 80, 60);
+                    border-radius: 3px;
+                }
+            """
         else:
             group_style_controls = """
                 QGroupBox {
                     background-color: rgba(255, 255, 255, 150);
                     border: 2px solid #4a90e2;
+                    border-radius: 10px;
+                    padding-top: 20px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    padding: 0 10px;
+                    color: #2c3e50;
+                }
+            """
+            group_style_explorer = """
+                QGroupBox {
+                    background-color: rgba(255, 255, 255, 120);
+                    border: 2px solid #9b59b6;
                     border-radius: 10px;
                     padding-top: 20px;
                     font-size: 14px;
@@ -500,9 +672,57 @@ class MainWindow(QMainWindow):
                 }
             """
             slider_label_style = "color: #2c3e50; font-weight: bold;"
+            
+            combo_style = """
+                QComboBox {
+                    background-color: rgba(255, 255, 255, 100);
+                    border: 1px solid #bdc3c7;
+                    border-radius: 5px;
+                    padding: 5px;
+                    font-size: 12px;
+                    color: #2c3e50;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                }
+                QComboBox::down-arrow {
+                    width: 12px;
+                    height: 12px;
+                }
+            """
+            
+            tree_style = """
+                QTreeView {
+                    background-color: rgba(255, 255, 255, 80);
+                    border: 1px solid #bdc3c7;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    color: #2c3e50;
+                }
+                QTreeView::item {
+                    padding: 2px;
+                }
+                QTreeView::item:selected {
+                    background-color: rgba(74, 144, 226, 0.3);
+                }
+                QTreeView::item:hover {
+                    background-color: rgba(74, 144, 226, 0.1);
+                }
+            """
+            
+            file_label_style = """
+                QLabel {
+                    color: #2c3e50;
+                    font-size: 11px;
+                    padding: 5px;
+                    background-color: rgba(255, 255, 255, 60);
+                    border-radius: 3px;
+                }
+            """
         
         # Find and update all widgets
         self.controls_group.setStyleSheet(group_style_controls)
+        self.explorer_group.setStyleSheet(group_style_explorer)
         self.webview_group.setStyleSheet(group_style_webview)
         self.native_group.setStyleSheet(group_style_native)
         
@@ -515,9 +735,56 @@ class MainWindow(QMainWindow):
         self.opacity_slider.setStyleSheet(slider_style)
         self.status_label.setStyleSheet(status_style)
         
+        # Update explorer widgets
+        self.dir_combo.setStyleSheet(combo_style)
+        self.file_tree.setStyleSheet(tree_style)
+        self.selected_file_label.setStyleSheet(file_label_style)
+        
         # Update webview content with dark mode
         self.apply_dark_mode_to_webview()
     
+    def change_directory(self, text):
+        """Change the file explorer directory"""
+        current_data = self.dir_combo.currentData()
+        if current_data and os.path.exists(current_data):
+            self.file_model.setRootPath(current_data)
+            self.file_tree.setRootIndex(self.file_model.index(current_data))
+            self.selected_file_label.setText("No file selected")
+    
+    def file_selected(self, index):
+        """Handle file selection in the tree view"""
+        file_path = self.file_model.filePath(index)
+        file_info = QFileInfo(file_path)
+        
+        if file_info.isFile():
+            file_name = file_info.fileName()
+            file_size = file_info.size()
+            
+            # Format file size
+            if file_size < 1024:
+                size_str = f"{file_size} B"
+            elif file_size < 1024 * 1024:
+                size_str = f"{file_size / 1024:.1f} KB"
+            else:
+                size_str = f"{file_size / (1024 * 1024):.1f} MB"
+            
+            self.selected_file_label.setText(f"Selected: {file_name}\nSize: {size_str}")
+            
+            # If it's a text file, load it into the text editor
+            text_extensions = ['.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md']
+            if any(file_name.lower().endswith(ext) for ext in text_extensions):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if len(content) < 10000:  # Only load small files
+                            self.text_edit.setPlainText(content)
+                        else:
+                            self.text_edit.setPlainText(f"File too large to display ({size_str})")
+                except Exception as e:
+                    self.text_edit.setPlainText(f"Error reading file: {str(e)}")
+        else:
+            self.selected_file_label.setText(f"Directory: {file_info.fileName()}")
+
     def apply_dark_mode_to_webview(self):
         if self.dark_mode:
             dark_css = """
