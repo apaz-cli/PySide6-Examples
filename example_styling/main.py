@@ -97,8 +97,6 @@ class MainWindow(QMainWindow):
         self.load_bg_btn = QPushButton("Load Background Image")
         self.load_bg_btn.clicked.connect(self.load_background)
         
-        self.refresh_btn = QPushButton("Refresh WebView")
-        self.refresh_btn.clicked.connect(self.refresh_webview)
         
         
         self.clear_bg_btn = QPushButton("Clear Background")
@@ -108,7 +106,6 @@ class MainWindow(QMainWindow):
         self.dark_mode_btn.clicked.connect(theme_manager.toggle_dark_mode)
         
         button_layout.addWidget(self.load_bg_btn)
-        button_layout.addWidget(self.refresh_btn)
         button_layout.addWidget(self.clear_bg_btn)
         button_layout.addWidget(self.dark_mode_btn)
         button_layout.addStretch()
@@ -233,8 +230,7 @@ class MainWindow(QMainWindow):
         
         # Apply button styles
         button_style = theme_manager.get_button_style()
-        for button in [self.load_bg_btn, self.refresh_btn, 
-                      self.clear_bg_btn, self.dark_mode_btn]:
+        for button in [self.load_bg_btn, self.clear_bg_btn, self.dark_mode_btn]:
             button.setStyleSheet(button_style)
         
         # Apply other widget styles
@@ -324,10 +320,6 @@ class MainWindow(QMainWindow):
     
     
     
-    def refresh_webview(self):
-        # Reset Monaco editor to initial content
-        self.monaco_editor.set_content("# Welcome to Monaco Editor\nprint('Hello World!')")
-        self.monaco_editor.set_language("python")
 
 
 def main():
