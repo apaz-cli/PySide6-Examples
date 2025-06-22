@@ -17,7 +17,7 @@ class TransparentWidget(QWidget):
         super().__init__()
         self.background_pixmap = None
         self.background_opacity = 0.7
-        self.dark_mode = False
+        self.dark_mode = theme_manager.dark_mode
         
     def set_background_image(self, pixmap):
         self.background_pixmap = pixmap
