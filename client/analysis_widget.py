@@ -58,6 +58,8 @@ class AnalysisWidget(QWidget):
         self.setup_cpp_language_tab()
         self.setup_rust_language_tab()
         self.setup_triton_language_tab()
+        self.setup_cuda_language_tab()
+        self.setup_hip_language_tab()
         
         # Shared errors tab at main level
         self.error_text = QTextEdit()
@@ -169,6 +171,66 @@ class AnalysisWidget(QWidget):
         self.triton_tab_widget.addTab(self.triton_perf_text, "📊 Performance")
         
         self.main_tab_widget.addTab(self.triton_tab_widget, "🚀 Triton")
+    
+    def setup_cuda_language_tab(self):
+        """Setup CUDA language tab with nested analysis tabs"""
+        self.cuda_tab_widget = QTabWidget()
+        
+        # Kernel AST tab
+        self.cuda_ast_text = QTextEdit()
+        self.cuda_ast_text.setReadOnly(True)
+        self.cuda_ast_text.setPlainText("Select a CUDA file to see kernel AST")
+        self.cuda_tab_widget.addTab(self.cuda_ast_text, "🌳 Kernel AST")
+        
+        # PTX tab
+        self.cuda_ptx_text = QTextEdit()
+        self.cuda_ptx_text.setReadOnly(True)
+        self.cuda_ptx_text.setPlainText("Select a CUDA file to see generated PTX")
+        self.cuda_tab_widget.addTab(self.cuda_ptx_text, "🎯 PTX")
+        
+        # SASS tab
+        self.cuda_sass_text = QTextEdit()
+        self.cuda_sass_text.setReadOnly(True)
+        self.cuda_sass_text.setPlainText("Select a CUDA file to see SASS assembly")
+        self.cuda_tab_widget.addTab(self.cuda_sass_text, "⚡ SASS")
+        
+        # Performance tab
+        self.cuda_perf_text = QTextEdit()
+        self.cuda_perf_text.setReadOnly(True)
+        self.cuda_perf_text.setPlainText("Select a CUDA file to see performance analysis")
+        self.cuda_tab_widget.addTab(self.cuda_perf_text, "📊 Performance")
+        
+        self.main_tab_widget.addTab(self.cuda_tab_widget, "🟢 CUDA")
+    
+    def setup_hip_language_tab(self):
+        """Setup HIP language tab with nested analysis tabs"""
+        self.hip_tab_widget = QTabWidget()
+        
+        # Kernel AST tab
+        self.hip_ast_text = QTextEdit()
+        self.hip_ast_text.setReadOnly(True)
+        self.hip_ast_text.setPlainText("Select a HIP file to see kernel AST")
+        self.hip_tab_widget.addTab(self.hip_ast_text, "🌳 Kernel AST")
+        
+        # GCN ISA tab
+        self.hip_gcn_text = QTextEdit()
+        self.hip_gcn_text.setReadOnly(True)
+        self.hip_gcn_text.setPlainText("Select a HIP file to see GCN ISA")
+        self.hip_tab_widget.addTab(self.hip_gcn_text, "🎯 GCN ISA")
+        
+        # LLVM IR tab
+        self.hip_llvm_text = QTextEdit()
+        self.hip_llvm_text.setReadOnly(True)
+        self.hip_llvm_text.setPlainText("Select a HIP file to see LLVM IR")
+        self.hip_tab_widget.addTab(self.hip_llvm_text, "⚙️ LLVM IR")
+        
+        # Performance tab
+        self.hip_perf_text = QTextEdit()
+        self.hip_perf_text.setReadOnly(True)
+        self.hip_perf_text.setPlainText("Select a HIP file to see performance analysis")
+        self.hip_tab_widget.addTab(self.hip_perf_text, "📊 Performance")
+        
+        self.main_tab_widget.addTab(self.hip_tab_widget, "🔴 HIP")
     
     def connect_signals(self):
         """Connect signals"""
