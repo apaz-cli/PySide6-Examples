@@ -468,15 +468,16 @@ class SandboxWidget(QWidget):
         overview.append(f'<h3 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">📋 Functions Overview</h3>')
         
         for func in analysis.functions:
-            func_name = func.name if func.name != "<module>" else "🏠 Main Module"
+            func_name = func.name if func.name != "<module>" else "Main Module"
+            signature = self._build_function_signature(func)
+            
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
                 <a href="#func_{func.name}" style="color: {type_colors["CALL"]}; text-decoration: none; font-weight: bold;">
                     {func_name}
                 </a>
-                <span style="color: {colors["text_secondary"]}; margin-left: 10px;">
-                    Args: {func.argcount}, Locals: {len(func.varnames)}, 
-                    Freevars: {len(func.freevars)}, Cellvars: {len(func.cellvars)}
+                <span style="color: {colors["text_secondary"]}; margin-left: 10px; font-family: monospace;">
+                    {signature}
                 </span>
             </div>
             ''')
@@ -628,6 +629,38 @@ class SandboxWidget(QWidget):
             if var_name in func.varnames or var_name in func.freevars or var_name in func.cellvars:
                 return func.name
         return None
+    
+    def _build_function_signature(self, func):
+        """Build a function signature string from function info"""
+        if func.name == "<module>":
+            return "(module)"
+        
+        # Build parameter list
+        params = []
+        
+        # Regular positional arguments
+        for i in range(func.argcount):
+            if i < len(func.varnames):
+                params.append(func.varnames[i])
+        
+        # Keyword-only arguments
+        kwonly_start = func.argcount
+        for i in range(func.kwonlyargcount):
+            param_idx = kwonly_start + i
+            if param_idx < len(func.varnames):
+                params.append(f"{func.varnames[param_idx]}=...")
+        
+        # Add *args if there are more varnames than accounted for
+        remaining_vars = len(func.varnames) - func.argcount - func.kwonlyargcount
+        if remaining_vars > 0:
+            # Check if there might be *args/**kwargs by looking at remaining varnames
+            if remaining_vars >= 1:
+                params.append("*args")
+            if remaining_vars >= 2:
+                params.append("**kwargs")
+        
+        signature = f"({', '.join(params)})"
+        return signature
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
