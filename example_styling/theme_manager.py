@@ -144,8 +144,9 @@ class ThemeManager(QObject):
                     border: 2px solid {border_color};
                     border-radius: 10px;
                     padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
+                    font-family: 'lemon';
+                    font-size: 15pt;
+                    font-weight: normal;
                     color: {colors['text']};
                 }}
                 QGroupBox::title {{
@@ -163,8 +164,9 @@ class ThemeManager(QObject):
                     border: {'1px solid ' + colors['border'] if self.dark_mode else 'none'};
                     padding: 8px 16px;
                     border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
+                    font-family: 'lemon';
+                    font-size: 12.5pt;
+                    font-weight: normal;
                 }}
                 QPushButton:hover {{
                     background-color: {colors['button_hover']};
@@ -192,13 +194,14 @@ class ThemeManager(QObject):
         
         elif widget_type == 'label':
             alpha = options.get('background_alpha', 80)
-            size = options.get('font_size', 13)
+            size = options.get('font_size', 12.5)
             padding = options.get('padding', 10)
             bg_color = colors['background'].replace('120', str(alpha))
             return f"""
                 QLabel {{
                     color: {colors['text']};
-                    font-size: {size}px;
+                    font-family: 'lemon';
+                    font-size: {size}pt;
                     padding: {padding}px;
                     background-color: {bg_color};
                     border-radius: 5px;
@@ -212,7 +215,8 @@ class ThemeManager(QObject):
                     border: 1px solid {colors['border']};
                     border-radius: 5px;
                     padding: 5px;
-                    font-size: 12px;
+                    font-family: 'lemon';
+                    font-size: 12.5pt;
                     color: {colors['text']};
                 }}
                 QComboBox::drop-down {{
@@ -226,7 +230,8 @@ class ThemeManager(QObject):
                     background-color: {colors['background'].replace('120', '80')};
                     border: 1px solid {colors['border']};
                     border-radius: 5px;
-                    font-size: 12px;
+                    font-family: 'lemon';
+                    font-size: 12.5pt;
                     color: {colors['text']};
                 }}
                 QTreeView::item {{
@@ -241,14 +246,15 @@ class ThemeManager(QObject):
             """
         
         elif widget_type == 'text':
-            return f"color: {colors['text']}; font-weight: bold;"
+            return f"color: {colors['text']}; font-family: 'lemon'; font-size: 12.5pt; font-weight: normal;"
         
         elif widget_type == 'placeholder':
             return f"""
                 QLabel {{
                     color: {colors['text_secondary']};
-                    font-size: 12px;
-                    font-style: italic;
+                    font-family: 'lemon';
+                    font-size: 12.5pt;
+                    font-style: normal;
                     padding: 20px;
                     background-color: {colors['background'].replace('120', '50')};
                     border: 2px dashed {colors['border']};
