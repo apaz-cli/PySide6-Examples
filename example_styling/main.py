@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QGroupBox, QSlider, QFileDialog)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
-from monaco_widget import StyledMonacoWidget
+from monaco_widget import MonacoEditorWidget
 from file_explorer import FileExplorer
 from theme_manager import theme_manager
 
@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
         self.editor_group.setObjectName("editor_group")
         editor_layout = QVBoxLayout()
         
-        self.monaco_editor = StyledMonacoWidget()
+        self.monaco_editor = MonacoEditorWidget()
         self.monaco_editor.content_changed.connect(self.on_editor_content_changed)
         self.monaco_editor.set_language("python")
         self.monaco_editor.set_content("# Welcome to Monaco Editor\nprint('Hello World!')")
@@ -192,23 +192,23 @@ class MainWindow(QMainWindow):
     def apply_theme(self):
         """Apply current theme to all widgets"""
         # Apply group box styles
-        self.controls_group.setStyleSheet(theme_manager.get_group_box_style('primary'))
-        self.editor_group.setStyleSheet(theme_manager.get_group_box_style('secondary'))
-        self.placeholder_group.setStyleSheet(theme_manager.get_group_box_style('accent'))
+        self.controls_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='primary'))
+        self.editor_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='secondary'))
+        self.placeholder_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='accent'))
         
         # Apply button styles
-        button_style = theme_manager.get_button_style()
+        button_style = theme_manager.get_widget_style('button')
         for button in [self.load_bg_btn, self.clear_bg_btn, self.dark_mode_btn]:
             button.setStyleSheet(button_style)
         
         # Apply other widget styles
-        self.slider_label.setStyleSheet(theme_manager.get_text_label_style())
-        self.opacity_label.setStyleSheet(theme_manager.get_text_label_style())
-        self.opacity_slider.setStyleSheet(theme_manager.get_slider_style())
+        self.slider_label.setStyleSheet(theme_manager.get_widget_style('text'))
+        self.opacity_label.setStyleSheet(theme_manager.get_widget_style('text'))
+        self.opacity_slider.setStyleSheet(theme_manager.get_widget_style('slider'))
         
         # Apply placeholder styles
-        self.info_label.setStyleSheet(theme_manager.get_label_style())
-        self.placeholder_content.setStyleSheet(theme_manager.get_placeholder_content_style())
+        self.info_label.setStyleSheet(theme_manager.get_widget_style('label'))
+        self.placeholder_content.setStyleSheet(theme_manager.get_widget_style('placeholder'))
     
     def load_file_content(self, content, language):
         """Load file content into Monaco editor"""
