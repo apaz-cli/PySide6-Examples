@@ -4,8 +4,9 @@ Parses Python bytecode disassembly into structured data for analysis and visuali
 """
 
 import re
+import dis
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from enum import Enum
 
 
@@ -46,6 +47,22 @@ class BytecodeInstruction:
 
 
 @dataclass
+class FunctionInfo:
+    """Information about a function in the bytecode"""
+    name: str
+    code_object: Any
+    start_offset: int
+    end_offset: int
+    varnames: List[str]  # Local variables
+    names: List[str]     # Global names
+    freevars: List[str]  # Free variables (nonlocals)
+    cellvars: List[str]  # Cell variables
+    constants: List[Any] # Constants
+    argcount: int
+    kwonlyargcount: int
+    instructions: List[BytecodeInstruction]
+
+@dataclass
 class BytecodeAnalysis:
     """Analysis results for bytecode"""
     instructions: List[BytecodeInstruction]
@@ -54,6 +71,8 @@ class BytecodeAnalysis:
     global_vars: Set[str]
     constants: Set[str]
     function_calls: List[str]
+    functions: List[FunctionInfo]  # All functions found in the code
+    main_function: Optional[FunctionInfo]  # The main module function
     
     @property
     def loads(self) -> List[BytecodeInstruction]:
@@ -182,8 +201,105 @@ class BytecodeParser:
             local_vars=local_vars,
             global_vars=global_vars,
             constants=constants,
-            function_calls=function_calls
+            function_calls=function_calls,
+            functions=[],  # Will be populated by analyze_code_object
+            main_function=None
         )
+    
+    def analyze_code_object(self, code_obj, source_code: str = "") -> BytecodeAnalysis:
+        """Analyze a code object directly to get detailed function information"""
+        functions = []
+        all_instructions = []
+        jump_targets = set()
+        local_vars = set()
+        global_vars = set()
+        constants = set()
+        function_calls = []
+        
+        # Analyze main code object
+        main_function = self._analyze_single_function(code_obj, "<module>", 0)
+        functions.append(main_function)
+        
+        # Find nested functions by looking for LOAD_CONST instructions with code objects
+        self._find_nested_functions(code_obj, functions, len(main_function.instructions))
+        
+        # Collect all instructions and metadata
+        for func in functions:
+            all_instructions.extend(func.instructions)
+            local_vars.update(func.varnames)
+            global_vars.update(func.names)
+            constants.update(str(c) for c in func.constants if c is not None)
+            
+            # Extract function calls from instructions
+            for instr in func.instructions:
+                if instr.instruction_type == InstructionType.CALL and instr.argval:
+                    function_calls.append(instr.argval)
+        
+        # Collect jump targets
+        for instr in all_instructions:
+            if instr.is_jump_target:
+                jump_targets.add(instr.offset)
+        
+        return BytecodeAnalysis(
+            instructions=all_instructions,
+            jump_targets=jump_targets,
+            local_vars=local_vars,
+            global_vars=global_vars,
+            constants=constants,
+            function_calls=function_calls,
+            functions=functions,
+            main_function=main_function
+        )
+    
+    def _analyze_single_function(self, code_obj, name: str, offset_base: int) -> FunctionInfo:
+        """Analyze a single function's code object"""
+        instructions = []
+        
+        # Get bytecode instructions using dis module
+        bytecode_iter = dis.Bytecode(code_obj)
+        
+        for instr in bytecode_iter:
+            # Convert dis.Instruction to our BytecodeInstruction
+            instruction_type = self.instruction_map.get(instr.opname, InstructionType.OTHER)
+            
+            bytecode_instr = BytecodeInstruction(
+                offset=instr.offset + offset_base,
+                opname=instr.opname,
+                arg=instr.arg,
+                argval=instr.argval,
+                argrepr=instr.argrepr,
+                line_number=instr.starts_line,
+                is_jump_target=instr.is_jump_target,
+                instruction_type=instruction_type
+            )
+            instructions.append(bytecode_instr)
+        
+        return FunctionInfo(
+            name=name,
+            code_object=code_obj,
+            start_offset=offset_base,
+            end_offset=offset_base + len(instructions) * 2,  # Approximate
+            varnames=list(code_obj.co_varnames),
+            names=list(code_obj.co_names),
+            freevars=list(code_obj.co_freevars),
+            cellvars=list(code_obj.co_cellvars),
+            constants=list(code_obj.co_consts),
+            argcount=code_obj.co_argcount,
+            kwonlyargcount=getattr(code_obj, 'co_kwonlyargcount', 0),
+            instructions=instructions
+        )
+    
+    def _find_nested_functions(self, code_obj, functions: List[FunctionInfo], offset_base: int):
+        """Recursively find nested functions in constants"""
+        for const in code_obj.co_consts:
+            if hasattr(const, 'co_code'):  # It's a code object
+                func_name = const.co_name
+                nested_func = self._analyze_single_function(const, func_name, offset_base)
+                functions.append(nested_func)
+                
+                # Recursively find functions within this function
+                self._find_nested_functions(const, functions, offset_base + len(nested_func.instructions) * 2)
+                offset_base += len(nested_func.instructions) * 2
     
     def _parse_instruction_line(self, line: str, jump_targets: Set[int]) -> Optional[BytecodeInstruction]:
         """Parse a single line of disassembly output"""
