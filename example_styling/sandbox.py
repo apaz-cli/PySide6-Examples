@@ -9,7 +9,7 @@ import io
 import sys
 from pathlib import Path
 from PySide6.QtCore import Qt, Signal, QObject
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, QTextBrowser,
                                QLabel, QScrollArea)
 from theme_manager import theme_manager
 from bytecode_parser import BytecodeParser
@@ -146,8 +146,7 @@ class SandboxWidget(QWidget):
         self.tab_widget.addTab(self.ast_text, "🌳 AST")
         
         # Disassembly tab - custom rich bytecode display
-        self.dis_text = QTextEdit()
-        self.dis_text.setReadOnly(True)
+        self.dis_text = QTextBrowser()
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
         self.dis_text.setOpenExternalLinks(False)
         self.dis_text.anchorClicked.connect(self.handle_bytecode_link)
