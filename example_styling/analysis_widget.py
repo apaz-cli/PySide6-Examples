@@ -531,14 +531,13 @@ class AnalysisWidget(QWidget):
     
     def show_server_unavailable_message(self):
         """Show server unavailable message and hide analysis UI"""
-        self.status_label.setText("⚠️ Analysis server cannot be reached")
-        self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
-        
-        # Hide the main analysis UI
+        # Hide the status label and main analysis UI
+        self.status_label.hide()
         self.main_tab_widget.hide()
         
         # Show error message
         self.error_widget.setText(
+            "⚠️ Analysis server cannot be reached\n\n"
             "The analysis server is not available.\n\n"
             "Please ensure the server is running and try again.\n"
             "Analysis features will be unavailable until the server connection is restored."
