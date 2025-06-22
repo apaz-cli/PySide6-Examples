@@ -80,8 +80,9 @@ class MainWindow(QMainWindow):
         self.central_widget = TransparentWidget()
         self.setCentralWidget(self.central_widget)
         
-        # Connect to theme manager
+        # Connect to theme manager and set initial button text
         theme_manager.theme_changed.connect(self.on_theme_changed)
+        self._update_dark_mode_button_text()
         main_layout = QVBoxLayout(self.central_widget)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -180,14 +181,15 @@ class MainWindow(QMainWindow):
     def on_theme_changed(self, dark_mode):
         """Handle theme changes"""
         self.central_widget.set_dark_mode(dark_mode)
-        
-        # Update button text
-        if dark_mode:
+        self._update_dark_mode_button_text()
+        self.apply_theme()
+    
+    def _update_dark_mode_button_text(self):
+        """Update dark mode button text based on current theme"""
+        if theme_manager.dark_mode:
             self.dark_mode_btn.setText("☀️ Light Mode")
         else:
             self.dark_mode_btn.setText("🌙 Dark Mode")
-        
-        self.apply_theme()
     
     def apply_theme(self):
         """Apply current theme to all widgets"""

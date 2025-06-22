@@ -4,7 +4,8 @@ Provides centralized styling and theme management.
 """
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication
 
 
 class ThemeManager(QObject):
@@ -14,7 +15,29 @@ class ThemeManager(QObject):
     
     def __init__(self):
         super().__init__()
-        self.dark_mode = False
+        self.dark_mode = self._detect_system_theme()
+    
+    def _detect_system_theme(self):
+        """Detect if the system is using dark theme"""
+        try:
+            app = QApplication.instance()
+            if app:
+                palette = app.palette()
+                # Check if window background is darker than text color
+                window_color = palette.color(QPalette.Window)
+                text_color = palette.color(QPalette.WindowText)
+                
+                # Calculate luminance to determine if background is dark
+                window_luminance = (0.299 * window_color.red() + 
+                                  0.587 * window_color.green() + 
+                                  0.114 * window_color.blue()) / 255
+                
+                return window_luminance < 0.5
+        except:
+            pass
+        
+        # Fallback to light theme if detection fails
+        return False
     
     def toggle_dark_mode(self):
         """Toggle between light and dark mode"""
