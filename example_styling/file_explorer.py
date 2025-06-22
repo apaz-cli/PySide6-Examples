@@ -182,7 +182,7 @@ class FileExplorer(QWidget):
         self.group_box.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='purple'))
         self.dir_combo.setStyleSheet(theme_manager.get_widget_style('input'))
         self.file_tree.setStyleSheet(theme_manager.get_widget_style('tree'))
-        self.file_info_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=7.5, padding=5, background_alpha=60))
+        self.file_info_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5, background_alpha=60))
     
     def get_selected_file(self):
         """Get currently selected file path"""

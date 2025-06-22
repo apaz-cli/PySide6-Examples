@@ -424,7 +424,7 @@ class AnalysisWidget(QWidget):
         """Create enhanced HTML display modeled after dis.dis() with rich navigation"""
         colors = theme_manager.get_colors()
         font_family = theme_manager.current_font_family
-        font_size = max(7.5, theme_manager.current_font_size * 0.8)
+        font_size = max(8.0, theme_manager.current_font_size * 0.8)
         
         # Color scheme for different instruction types
         type_colors = {
@@ -866,7 +866,7 @@ class AnalysisWidget(QWidget):
                 border-radius: 5px;
                 padding: 5px;
                 font-family: '{theme_manager.current_font_family}', monospace;
-                font-size: {max(7.5, theme_manager.current_font_size * 0.8)}pt;
+                font-size: {max(8.0, theme_manager.current_font_size * 0.8)}pt;
                 color: {theme_manager.get_colors()['text']};
             }}
         """
@@ -903,7 +903,7 @@ class AnalysisWidget(QWidget):
                 border-top-left-radius: 5px;
                 border-top-right-radius: 5px;
                 font-family: '{theme_manager.current_font_family}';
-                font-size: {max(7.5, theme_manager.current_font_size * 0.7)}pt;
+                font-size: {max(8.0, theme_manager.current_font_size * 0.7)}pt;
             }}
             QTabBar::tab:selected {{
                 background-color: {theme_manager.get_colors()['primary']};
@@ -921,4 +921,4 @@ class AnalysisWidget(QWidget):
         self.triton_tab_widget.setStyleSheet(tab_style)
         
         # Apply status label style
-        self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=7.5, padding=5))
+        self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
