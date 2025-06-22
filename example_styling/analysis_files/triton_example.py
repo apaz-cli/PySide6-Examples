@@ -21,13 +21,13 @@ def softmax_dropout_kernel_slow(
                 row_data
             )
     
-    max_val = tl.float32(-float('inf'))
+    max_val = -float('inf')
     for i in range(n_cols):
         if i < BLOCK_SIZE:
             current_val = tl.where(
                 tl.arange(0, BLOCK_SIZE) == i,
                 row_data,
-                tl.float32(-float('inf'))
+                -float('inf')
             )
             max_val = tl.maximum(max_val, tl.max(current_val))
     
