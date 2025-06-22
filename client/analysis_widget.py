@@ -197,6 +197,8 @@ class AnalysisWidget(QWidget):
         # Set appropriate tab based on analyzer type
         if analyzer_type == 'python':
             self.main_tab_widget.setCurrentWidget(self.python_tab_widget)
+        elif analyzer_type == 'cpp':
+            self.main_tab_widget.setCurrentWidget(self.cpp_tab_widget)
         
         self.status_label.setText(f"Analyzing {file_path.name} with {analyzer_type}...")
         
@@ -229,13 +231,24 @@ class AnalysisWidget(QWidget):
         except:
             return False
     
-    def analyze_cpp_file(self, file_path):
-        """Analyze C/C++ file (placeholder)"""
-        self.clear_analysis()
-        self.cpp_ast_text.setPlainText("C/C++ AST analysis not yet implemented")
-        self.cpp_asm_text.setPlainText("C/C++ assembly analysis not yet implemented")
-        self.cpp_analysis_text.setPlainText("C/C++ static analysis not yet implemented")
-        self.error_text.setPlainText("C/C++ analysis coming soon")
+    def display_cpp_analysis(self, result: AnalysisResult):
+        """Display C/C++ analysis results"""
+        data = result.data
+        
+        # Update AST tab
+        self.cpp_ast_text.setPlainText(data.get('ast', 'No AST data available'))
+        
+        # Update assembly tab
+        self.cpp_asm_text.setPlainText(data.get('assembly', 'No assembly data available'))
+        
+        # Update analysis tab
+        self.cpp_analysis_text.setPlainText(data.get('analysis_summary', 'No analysis available'))
+        
+        # Update errors tab
+        if result.errors:
+            self.error_text.setPlainText('\n'.join(result.errors))
+        else:
+            self.error_text.setPlainText("No errors detected")
     
     def analyze_rust_file(self, file_path):
         """Analyze Rust file (placeholder)"""
@@ -268,6 +281,8 @@ class AnalysisWidget(QWidget):
         # Display results based on analyzer type
         if result.analyzer_type == 'python':
             self.display_python_analysis(result)
+        elif result.analyzer_type == 'cpp':
+            self.display_cpp_analysis(result)
         
         self.status_label.setText(f"Analysis complete: {self.current_file.name}")
     

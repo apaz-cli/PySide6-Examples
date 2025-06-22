@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from python_analyzer import PythonAnalyzer
+from cpp_analyzer import CppAnalyzer
 
 
 app = Flask(__name__)
@@ -16,7 +17,8 @@ CORS(app)
 
 # Initialize analyzers
 analyzers = {
-    'python': PythonAnalyzer()
+    'python': PythonAnalyzer(),
+    'cpp': CppAnalyzer()
 }
 
 
