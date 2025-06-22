@@ -207,7 +207,7 @@ class ThemeManager(QObject):
     
     def get_monaco_theme(self):
         """Get Monaco editor theme name"""
-        return 'vs-dark' if self.dark_mode else 'vs'
+        return 'transparent-dark' if self.dark_mode else 'transparent-light'
     
     def get_placeholder_content_style(self):
         """Get placeholder content stylesheet"""

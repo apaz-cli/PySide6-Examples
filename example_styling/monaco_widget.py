@@ -123,6 +123,9 @@ class MonacoEditorWidget(QWidget):
         
         # Web view for Monaco Editor
         self.web_view = QWebEngineView()
+        self.web_view.page().setBackgroundColor(Qt.transparent)
+        self.web_view.setAttribute(Qt.WA_TranslucentBackground)
+        self.web_view.setStyleSheet("background: transparent;")
         layout.addWidget(self.web_view)
     
     def _create_monaco_html(self):
@@ -217,11 +220,42 @@ class MonacoEditorWidget(QWidget):
                     // Clear loading message
                     document.getElementById('container').innerHTML = '';
                     
+                    // Define transparent themes
+                    monaco.editor.defineTheme('transparent-dark', {{
+                        base: 'vs-dark',
+                        inherit: true,
+                        rules: [],
+                        colors: {{
+                            'editor.background': '#00000000',
+                            'editor.lineHighlightBackground': '#ffffff08',
+                            'editorLineNumber.foreground': '#858585',
+                            'editorGutter.background': '#00000000',
+                            'editorWidget.background': '#2d2d30cc',
+                            'editorSuggestWidget.background': '#2d2d30cc',
+                            'editorHoverWidget.background': '#2d2d30cc'
+                        }}
+                    }});
+                    
+                    monaco.editor.defineTheme('transparent-light', {{
+                        base: 'vs',
+                        inherit: true,
+                        rules: [],
+                        colors: {{
+                            'editor.background': '#00000000',
+                            'editor.lineHighlightBackground': '#00000008',
+                            'editorLineNumber.foreground': '#237893',
+                            'editorGutter.background': '#00000000',
+                            'editorWidget.background': '#f3f3f3cc',
+                            'editorSuggestWidget.background': '#f3f3f3cc',
+                            'editorHoverWidget.background': '#f3f3f3cc'
+                        }}
+                    }});
+                    
                     // Create editor
                     editor = monaco.editor.create(document.getElementById('container'), {{
                         value: '',
                         language: 'javascript',
-                        theme: 'vs-dark',
+                        theme: 'transparent-dark',
                         automaticLayout: true,
                         fontSize: 14,
                         minimap: {{ enabled: true }},
@@ -497,6 +531,9 @@ class StyledMonacoWidget(QWidget):
         
         # Check if Monaco is available
         if hasattr(self.monaco_editor, 'monaco_interface'):
+            # Make the Monaco editor widget transparent
+            self.monaco_editor.setAttribute(Qt.WA_TranslucentBackground)
+            self.monaco_editor.setStyleSheet("background: transparent;")
             layout.addWidget(self.monaco_editor)
             self.editor_available = True
             # Wait for editor to be ready before applying theme
