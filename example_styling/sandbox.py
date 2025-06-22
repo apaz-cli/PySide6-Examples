@@ -7,6 +7,7 @@ import ast
 import dis
 import io
 import sys
+import inspect
 from pathlib import Path
 from PySide6.QtCore import Qt, Signal, QObject
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, QTextBrowser,
@@ -49,6 +50,9 @@ class PythonAnalyzer(QObject):
             tree = ast.parse(source_code, filename=filename)
             ast_result = self.format_ast_dump(tree)
             
+            # Extract function objects for signature inspection
+            self.function_objects = self._extract_function_objects(source_code, filename)
+            
             # Compile and disassemble
             try:
                 compiled_code = compile(tree, filename, 'exec')
@@ -65,6 +69,8 @@ class PythonAnalyzer(QObject):
                 # Parse bytecode for analysis using code object
                 try:
                     self.bytecode_analysis = self.bytecode_parser.analyze_code_object(compiled_code, source_code)
+                    # Pass function objects for signature inspection
+                    self.bytecode_analysis.function_objects = self.function_objects
                     bytecode_summary = self.bytecode_parser.format_analysis_summary(self.bytecode_analysis)
                 except Exception as e:
                     # Fallback to old method
@@ -85,6 +91,25 @@ class PythonAnalyzer(QObject):
             errors = f"Analysis error: {str(e)}"
             
         return ast_result, dis_result, bytecode_summary, errors
+    
+    def _extract_function_objects(self, source_code, filename):
+        """Extract function objects by executing the code"""
+        function_objects = {}
+        
+        try:
+            # Create a namespace to execute the code
+            namespace = {}
+            exec(compile(source_code, filename, 'exec'), namespace)
+            
+            # Extract function objects
+            for name, obj in namespace.items():
+                if inspect.isfunction(obj):
+                    function_objects[name] = obj
+        except Exception:
+            # If execution fails, we'll fall back to manual signature building
+            pass
+        
+        return function_objects
     
     def format_ast_dump(self, tree):
         """Format AST dump with better readability"""
@@ -635,68 +660,43 @@ class SandboxWidget(QWidget):
         if func.name == "<module>":
             return "(module)"
         
-        # Try to get type annotations from the code object's constants
-        annotations = self._extract_annotations(func)
+        # Try to use inspect.signature() if we have the function object
+        if hasattr(self.analyzer, 'function_objects') and func.name in self.analyzer.function_objects:
+            try:
+                func_obj = self.analyzer.function_objects[func.name]
+                sig = inspect.signature(func_obj)
+                return str(sig)
+            except Exception:
+                pass  # Fall back to manual method
         
-        # Build parameter list
+        # Fallback to manual signature building
+        return self._build_manual_signature(func)
+    
+    def _build_manual_signature(self, func):
+        """Build signature manually from bytecode info"""
         params = []
         
         # Regular positional arguments
         for i in range(func.argcount):
             if i < len(func.varnames):
-                param_name = func.varnames[i]
-                if param_name in annotations:
-                    params.append(f"{param_name}: {annotations[param_name]}")
-                else:
-                    params.append(param_name)
+                params.append(func.varnames[i])
         
         # Keyword-only arguments
         kwonly_start = func.argcount
         for i in range(func.kwonlyargcount):
             param_idx = kwonly_start + i
             if param_idx < len(func.varnames):
-                param_name = func.varnames[param_idx]
-                if param_name in annotations:
-                    params.append(f"{param_name}: {annotations[param_name]}=...")
-                else:
-                    params.append(f"{param_name}=...")
+                params.append(f"{func.varnames[param_idx]}=...")
         
-        # Add *args if there are more varnames than accounted for
+        # Add *args/**kwargs if there are more varnames
         remaining_vars = len(func.varnames) - func.argcount - func.kwonlyargcount
         if remaining_vars > 0:
-            # Check if there might be *args/**kwargs by looking at remaining varnames
             if remaining_vars >= 1:
                 params.append("*args")
             if remaining_vars >= 2:
                 params.append("**kwargs")
         
-        signature = f"({', '.join(params)})"
-        
-        # Add return type annotation if available
-        if 'return' in annotations:
-            signature += f" -> {annotations['return']}"
-        
-        return signature
-    
-    def _extract_annotations(self, func):
-        """Extract type annotations from function constants"""
-        annotations = {}
-        
-        # Look for __annotations__ in constants
-        for const in func.constants:
-            if isinstance(const, dict):
-                # Check if this looks like an annotations dict
-                for key, value in const.items():
-                    if isinstance(key, str):
-                        # Convert type objects to string representations
-                        if hasattr(value, '__name__'):
-                            annotations[key] = value.__name__
-                        elif hasattr(value, '_name'):  # typing module types
-                            annotations[key] = str(value)
-                        else:
-                            annotations[key] = str(value)
-        
-        return annotations
+        return f"({', '.join(params)})"
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
