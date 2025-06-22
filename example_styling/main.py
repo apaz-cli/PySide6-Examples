@@ -3,9 +3,10 @@ import os
 from PySide6.QtCore import Qt, QUrl, QTimer, QDir, QFileInfo
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QLabel, QTextEdit,
-                               QGroupBox, QSlider, QFileDialog, QTreeView, QComboBox)
+                               QGroupBox, QSlider, QFileDialog, QTreeView, QComboBox,
+                               QFileSystemModel)
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor, QFileSystemModel
+from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 
 
 class TransparentWidget(QWidget):
