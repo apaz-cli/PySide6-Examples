@@ -61,12 +61,6 @@ class AnalysisWidget(QWidget):
         self.setup_cuda_language_tab()
         self.setup_hip_language_tab()
         
-        # Shared errors tab at main level
-        self.error_text = QTextEdit()
-        self.error_text.setReadOnly(True)
-        self.error_text.setPlainText("No errors")
-        self.main_tab_widget.addTab(self.error_text, "⚠️ Errors")
-        
         layout.addWidget(self.main_tab_widget)
     
     def setup_python_language_tab(self):
@@ -306,11 +300,6 @@ class AnalysisWidget(QWidget):
         # Update analysis tab
         self.cpp_analysis_text.setPlainText(data.get('analysis_summary', 'No analysis available'))
         
-        # Update errors tab
-        if result.errors:
-            self.error_text.setPlainText('\n'.join(result.errors))
-        else:
-            self.error_text.setPlainText("No errors detected")
     
     def analyze_rust_file(self, file_path):
         """Analyze Rust file (placeholder)"""
@@ -336,8 +325,8 @@ class AnalysisWidget(QWidget):
             return
         
         if not result.success:
-            self.error_text.setPlainText('\n'.join(result.errors))
-            self.status_label.setText(f"Analysis failed: {self.current_file.name}")
+            error_msg = '\n'.join(result.errors) if result.errors else "Unknown error"
+            self.status_label.setText(f"Analysis failed: {error_msg}")
             return
         
         # Display results based on analyzer type
@@ -365,11 +354,6 @@ class AnalysisWidget(QWidget):
         # Update analysis tab
         self.analysis_text.setPlainText(data.get('analysis_summary', 'No analysis available'))
         
-        # Update errors tab
-        if result.errors:
-            self.error_text.setPlainText('\n'.join(result.errors))
-        else:
-            self.error_text.setPlainText("No errors detected")
     
     def clear_analysis(self):
         """Clear all analysis results"""
@@ -398,8 +382,6 @@ class AnalysisWidget(QWidget):
         self.triton_ptx_text.setPlainText("Select a Triton file to see generated PTX")
         self.triton_perf_text.setPlainText("Select a Triton file to see performance analysis")
         
-        # Clear shared tabs
-        self.error_text.setPlainText("No errors")
         self.status_label.setText("No file selected")
     
     def create_enhanced_bytecode_display(self, bytecode_analysis):
