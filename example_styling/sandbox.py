@@ -40,102 +40,67 @@ class PythonAnalyzer(QObject):
     
     def analyze_code(self, source_code, filename="<string>"):
         """Analyze Python source code"""
-        ast_result = ""
-        dis_result = ""
-        bytecode_summary = ""
-        errors = ""
-        
         try:
-            # Parse AST
             tree = ast.parse(source_code, filename=filename)
             ast_result = self.format_ast_dump(tree)
             
-            # Extract function objects for signature inspection
             self.function_objects = self._extract_function_objects(source_code, filename)
             
-            # Compile and disassemble
             try:
                 compiled_code = compile(tree, filename, 'exec')
                 
-                # Capture disassembly output for fallback
                 old_stdout = sys.stdout
                 sys.stdout = dis_output = io.StringIO()
-                
                 dis.dis(compiled_code)
-                
                 sys.stdout = old_stdout
                 dis_result = dis_output.getvalue()
                 
-                # Parse bytecode for analysis using code object
                 try:
                     self.bytecode_analysis = self.bytecode_parser.analyze_code_object(compiled_code, source_code, self.function_objects)
                     bytecode_summary = self.bytecode_parser.format_analysis_summary(self.bytecode_analysis)
                 except Exception as e:
-                    # Fallback to old method
                     self.bytecode_analysis = self.bytecode_parser.parse_disassembly(dis_result)
                     bytecode_summary = f"Using fallback analysis: {str(e)}\n\n" + self.bytecode_parser.format_analysis_summary(self.bytecode_analysis)
                 
+                return ast_result, dis_result, bytecode_summary, ""
+                
             except Exception as e:
-                dis_result = f"Compilation error: {str(e)}"
-                bytecode_summary = "Cannot analyze bytecode due to compilation error"
+                return ast_result, f"Compilation error: {str(e)}", "Cannot analyze bytecode due to compilation error", ""
                 
         except SyntaxError as e:
-            errors = f"Syntax Error: {e.msg} (line {e.lineno})"
-            ast_result = "Cannot parse due to syntax error"
-            dis_result = "Cannot disassemble due to syntax error"
-            bytecode_summary = "Cannot analyze bytecode due to syntax error"
+            error_msg = f"Syntax Error: {e.msg} (line {e.lineno})"
+            return "Cannot parse due to syntax error", "Cannot disassemble due to syntax error", "Cannot analyze bytecode due to syntax error", error_msg
             
         except Exception as e:
-            errors = f"Analysis error: {str(e)}"
-            
-        return ast_result, dis_result, bytecode_summary, errors
+            return "", "", "", f"Analysis error: {str(e)}"
     
     def _extract_function_objects(self, source_code, filename):
         """Extract function objects by executing the code"""
-        function_objects = {}
-        
         try:
-            # Create a namespace to execute the code
             namespace = {}
             exec(compile(source_code, filename, 'exec'), namespace)
-            
-            # Extract function objects
-            for name, obj in namespace.items():
-                if inspect.isfunction(obj):
-                    function_objects[name] = obj
+            return {name: obj for name, obj in namespace.items() if inspect.isfunction(obj)}
         except Exception:
-            # If execution fails, we'll fall back to manual signature building
-            pass
-        
-        return function_objects
+            return {}
     
     def format_ast_dump(self, tree):
         """Format AST dump with better readability"""
         dump = ast.dump(tree, indent=2)
         
-        # Add some formatting for better readability
-        lines = dump.split('\n')
-        formatted_lines = []
+        replacements = {
+            'FunctionDef(': '🔧 FunctionDef(',
+            'ClassDef(': '🏗️  ClassDef(',
+            'Import(': '📦 Import(',
+            'ImportFrom(': '📦 ImportFrom(',
+            'If(': '🔀 If(',
+            'For(': '🔄 For(',
+            'While(': '🔄 While('
+        }
         
-        for line in lines:
-            # Count leading spaces for indentation level
-            indent_level = len(line) - len(line.lstrip())
-            
-            # Add visual indicators for different AST node types
-            if 'FunctionDef(' in line:
-                line = line.replace('FunctionDef(', '🔧 FunctionDef(')
-            elif 'ClassDef(' in line:
-                line = line.replace('ClassDef(', '🏗️  ClassDef(')
-            elif 'Import(' in line or 'ImportFrom(' in line:
-                line = line.replace('Import(', '📦 Import(').replace('ImportFrom(', '📦 ImportFrom(')
-            elif 'If(' in line:
-                line = line.replace('If(', '🔀 If(')
-            elif 'For(' in line or 'While(' in line:
-                line = line.replace('For(', '🔄 For(').replace('While(', '🔄 While(')
-            
-            formatted_lines.append(line)
+        for old, new in replacements.items():
+            dump = dump.replace(old, new)
         
-        return '\n'.join(formatted_lines)
+        return dump
 
 
 class SandboxWidget(QWidget):
@@ -323,13 +288,11 @@ class SandboxWidget(QWidget):
         suffix = file_path.suffix.lower()
         
         if suffix == '.py':
-            return 'python'
+            return 'triton' if self.is_triton_file(file_path) else 'python'
         elif suffix in ['.c', '.cpp', '.cxx', '.cc', '.h', '.hpp', '.hxx']:
             return 'cpp'
         elif suffix == '.rs':
             return 'rust'
-        elif suffix == '.py' and self.is_triton_file(file_path):
-            return 'triton'
         else:
             return 'unknown'
     
@@ -339,76 +302,59 @@ class SandboxWidget(QWidget):
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 return 'triton' in content.lower() and '@triton.jit' in content
-        except:
+        except Exception:
             return False
     
     def analyze_cpp_file(self, file_path):
         """Analyze C/C++ file (placeholder)"""
-        self.clear_analysis()
-        self.cpp_ast_text.setPlainText("C/C++ AST analysis not yet implemented")
-        self.cpp_asm_text.setPlainText("C/C++ assembly analysis not yet implemented")
-        self.cpp_analysis_text.setPlainText("C/C++ static analysis not yet implemented")
-        self.error_text.setPlainText("C/C++ analysis coming soon")
+        self._set_placeholder_text("C/C++", [
+            (self.cpp_ast_text, "C/C++ AST analysis not yet implemented"),
+            (self.cpp_asm_text, "C/C++ assembly analysis not yet implemented"),
+            (self.cpp_analysis_text, "C/C++ static analysis not yet implemented")
+        ])
     
     def analyze_rust_file(self, file_path):
         """Analyze Rust file (placeholder)"""
-        self.clear_analysis()
-        self.rust_hir_text.setPlainText("Rust HIR analysis not yet implemented")
-        self.rust_mir_text.setPlainText("Rust MIR analysis not yet implemented")
-        self.rust_llvm_text.setPlainText("Rust LLVM IR analysis not yet implemented")
-        self.rust_analysis_text.setPlainText("Rust borrow checker analysis not yet implemented")
-        self.error_text.setPlainText("Rust analysis coming soon")
+        self._set_placeholder_text("Rust", [
+            (self.rust_hir_text, "Rust HIR analysis not yet implemented"),
+            (self.rust_mir_text, "Rust MIR analysis not yet implemented"),
+            (self.rust_llvm_text, "Rust LLVM IR analysis not yet implemented"),
+            (self.rust_analysis_text, "Rust borrow checker analysis not yet implemented")
+        ])
     
     def analyze_triton_file(self, file_path):
         """Analyze Triton file (placeholder)"""
+        self._set_placeholder_text("Triton", [
+            (self.triton_ast_text, "Triton kernel AST analysis not yet implemented"),
+            (self.triton_ptx_text, "Triton PTX generation not yet implemented"),
+            (self.triton_perf_text, "Triton performance analysis not yet implemented")
+        ])
+    
+    def _set_placeholder_text(self, language, text_widgets):
+        """Helper to set placeholder text for language tabs"""
         self.clear_analysis()
-        self.triton_ast_text.setPlainText("Triton kernel AST analysis not yet implemented")
-        self.triton_ptx_text.setPlainText("Triton PTX generation not yet implemented")
-        self.triton_perf_text.setPlainText("Triton performance analysis not yet implemented")
-        self.error_text.setPlainText("Triton analysis coming soon")
+        for widget, text in text_widgets:
+            widget.setPlainText(text)
+        self.error_text.setPlainText(f"{language} analysis coming soon")
     
     def display_analysis(self, ast_result, dis_result, bytecode_summary, errors):
         """Display analysis results in tabs"""
-        # Update AST tab
-        if ast_result:
-            self.ast_text.setPlainText(ast_result)
-        else:
-            self.ast_text.setPlainText("No AST data available")
+        self.ast_text.setPlainText(ast_result or "No AST data available")
         
-        # Update disassembly tab with custom rich formatting
         if dis_result:
             try:
-                # Use the analysis from analyzer which has detailed function info
-                if hasattr(self.analyzer, 'bytecode_analysis'):
-                    self.bytecode_analysis = self.analyzer.bytecode_analysis
-                else:
-                    # Fallback to parsing dis output
-                    self.bytecode_analysis = self.analyzer.bytecode_parser.parse_disassembly(dis_result)
-                
+                self.bytecode_analysis = getattr(self.analyzer, 'bytecode_analysis', None) or self.analyzer.bytecode_parser.parse_disassembly(dis_result)
                 formatted_html = self.create_enhanced_bytecode_display(self.bytecode_analysis)
                 self.dis_text.setHtml(formatted_html)
             except Exception as e:
-                # Fallback to plain text if formatting fails
                 self.dis_text.setPlainText(f"Error parsing bytecode: {str(e)}\n\nRaw output:\n{dis_result}")
         else:
             self.dis_text.setPlainText("No disassembly data available")
             self.bytecode_analysis = None
         
-        # Update analysis tab
-        if bytecode_summary:
-            self.analysis_text.setPlainText(bytecode_summary)
-        else:
-            self.analysis_text.setPlainText("No bytecode analysis available")
+        self.analysis_text.setPlainText(bytecode_summary or "No bytecode analysis available")
+        self.error_text.setPlainText(errors or "No errors detected")
         
-        # Update errors tab
-        if errors:
-            self.error_text.setPlainText(errors)
-            # Switch to errors tab if there are errors
-            self.tab_widget.setCurrentIndex(3)
-        else:
-            self.error_text.setPlainText("No errors detected")
-        
-        # Update status
         if self.current_file:
             self.status_label.setText(f"Python analysis complete: {self.current_file.name}")
     
@@ -493,14 +439,12 @@ class SandboxWidget(QWidget):
         for func in analysis.functions:
             func_name = func.name if func.name != "<module>" else "Main Module"
             
-            # Build signature using inspect.signature if function object is available
             if func.name == "<module>":
                 signature = "(module)"
             elif func.function_object is not None:
-                sig = inspect.signature(func.function_object)
-                signature = str(sig)
+                signature = str(inspect.signature(func.function_object))
             else:
-                raise Exception
+                signature = "(signature unavailable)"
             
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
@@ -596,12 +540,11 @@ class SandboxWidget(QWidget):
     
     def _enhance_argrepr_links(self, instruction, analysis, instr_color):
         """Enhance argrepr with clickable links for variables and functions"""
+        import re
         argrepr_text = instruction.argrepr
         
-        # Make variable names clickable
         if instruction.instruction_type.name in ['LOAD', 'STORE'] and instruction.argval:
             var_name = instruction.argval
-            # Find which function this variable belongs to
             func_context = self._find_variable_context(var_name, analysis)
             if func_context:
                 argrepr_text = argrepr_text.replace(
@@ -609,48 +552,30 @@ class SandboxWidget(QWidget):
                     f'<a href="#var_{var_name}_{func_context}" style="color: {instr_color}; text-decoration: underline;" title="Go to {var_name} definition in {func_context}">{var_name}</a>'
                 )
         
-        # Make jump targets clickable
         elif instruction.instruction_type.name == 'JUMP':
-            import re
-            # Handle both "to 92" format and standalone numbers
             if 'to ' in instruction.argrepr:
-                # Match "(to 92)" pattern
                 target_match = re.search(r'\(to (\d+)\)', instruction.argrepr)
-                if target_match:
-                    target_offset = target_match.group(1)
-                    if int(target_offset) in analysis.jump_targets:
-                        argrepr_text = argrepr_text.replace(
-                            f'to {target_offset}',
-                            f'to <a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
-                        )
             else:
-                # Fallback for other jump formats
                 target_match = re.search(r'(\d+)', instruction.argrepr)
-                if target_match:
-                    target_offset = target_match.group(1)
-                    if int(target_offset) in analysis.jump_targets:
-                        argrepr_text = argrepr_text.replace(
-                            target_offset,
-                            f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
-                        )
+            
+            if target_match:
+                target_offset = target_match.group(1)
+                if int(target_offset) in analysis.jump_targets:
+                    old_text = f'to {target_offset}' if 'to ' in instruction.argrepr else target_offset
+                    new_text = f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
+                    if 'to ' in instruction.argrepr:
+                        new_text = f'to {new_text}'
+                    argrepr_text = argrepr_text.replace(old_text, new_text)
         
-        # Make function calls clickable
         elif instruction.instruction_type.name == 'CALL' and instruction.argval:
             func_name = instruction.argval
-            # Check if this function is defined in our analysis
-            for func in analysis.functions:
-                if func.name == func_name:
-                    argrepr_text = argrepr_text.replace(
-                        func_name,
-                        f'<a href="#func_{func_name}" style="color: {instr_color}; text-decoration: underline;" title="Go to {func_name} definition">{func_name}</a>'
-                    )
-                    break
-            else:
-                # External function call
-                argrepr_text = argrepr_text.replace(
-                    func_name,
-                    f'<a href="#call_{func_name}" style="color: {instr_color}; text-decoration: underline;" title="Find all calls to {func_name}">{func_name}</a>'
-                )
+            is_internal = any(func.name == func_name for func in analysis.functions)
+            href = f"#func_{func_name}" if is_internal else f"#call_{func_name}"
+            title = f"Go to {func_name} definition" if is_internal else f"Find all calls to {func_name}"
+            argrepr_text = argrepr_text.replace(
+                func_name,
+                f'<a href="{href}" style="color: {instr_color}; text-decoration: underline;" title="{title}">{func_name}</a>'
+            )
         
         return argrepr_text
     
@@ -660,7 +585,6 @@ class SandboxWidget(QWidget):
             if var_name in func.varnames or var_name in func.freevars or var_name in func.cellvars:
                 return func.name
         return None
-    
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
@@ -678,8 +602,6 @@ class SandboxWidget(QWidget):
         
         if instruction.argval:
             tooltip_parts.append(f"Value: {instruction.argval}")
-            
-            # Add context for variables
             if instruction.instruction_type.name in ['LOAD', 'STORE']:
                 context = self._find_variable_context(instruction.argval, analysis)
                 if context:
@@ -757,45 +679,39 @@ class SandboxWidget(QWidget):
     
     def apply_theme(self):
         """Apply current theme to the widget"""
-        # Apply text edit styles
+        colors = theme_manager.get_colors()
+        
         text_style = f"""
             QTextEdit {{
-                background-color: {theme_manager.get_colors()['input_bg']};
-                border: 1px solid {theme_manager.get_colors()['border']};
+                background-color: {colors['input_bg']};
+                border: 1px solid {colors['border']};
                 border-radius: 5px;
                 padding: 5px;
                 font-family: '{theme_manager.current_font_family}', monospace;
                 font-size: {max(7.5, theme_manager.current_font_size * 0.8)}pt;
-                color: {theme_manager.get_colors()['text']};
+                color: {colors['text']};
             }}
         """
         
-        # Apply to all text widgets
         text_widgets = [
-            # Python tabs
             self.ast_text, self.dis_text, self.analysis_text,
-            # C/C++ tabs
             self.cpp_ast_text, self.cpp_asm_text, self.cpp_analysis_text,
-            # Rust tabs
             self.rust_hir_text, self.rust_mir_text, self.rust_llvm_text, self.rust_analysis_text,
-            # Triton tabs
             self.triton_ast_text, self.triton_ptx_text, self.triton_perf_text,
-            # Shared tabs
             self.error_text
         ]
         
-        for text_widget in text_widgets:
-            text_widget.setStyleSheet(text_style)
+        for widget in text_widgets:
+            widget.setStyleSheet(text_style)
         
-        # Apply tab widget styles
         tab_style = f"""
             QTabWidget::pane {{
-                border: 1px solid {theme_manager.get_colors()['border']};
+                border: 1px solid {colors['border']};
                 border-radius: 5px;
-                background-color: {theme_manager.get_colors()['background']};
+                background-color: {colors['background']};
             }}
             QTabBar::tab {{
-                background-color: {theme_manager.get_colors()['button_bg']};
+                background-color: {colors['button_bg']};
                 color: white;
                 padding: 8px 12px;
                 margin-right: 2px;
@@ -805,19 +721,14 @@ class SandboxWidget(QWidget):
                 font-size: {max(7.5, theme_manager.current_font_size * 0.7)}pt;
             }}
             QTabBar::tab:selected {{
-                background-color: {theme_manager.get_colors()['primary']};
+                background-color: {colors['primary']};
             }}
             QTabBar::tab:hover {{
-                background-color: {theme_manager.get_colors()['button_hover']};
+                background-color: {colors['button_hover']};
             }}
         """
         
-        # Apply to all tab widgets
-        self.main_tab_widget.setStyleSheet(tab_style)
-        self.python_tab_widget.setStyleSheet(tab_style)
-        self.cpp_tab_widget.setStyleSheet(tab_style)
-        self.rust_tab_widget.setStyleSheet(tab_style)
-        self.triton_tab_widget.setStyleSheet(tab_style)
+        for tab_widget in [self.main_tab_widget, self.python_tab_widget, self.cpp_tab_widget, self.rust_tab_widget, self.triton_tab_widget]:
+            tab_widget.setStyleSheet(tab_style)
         
-        # Apply status label style
         self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=7.5, padding=5))
