@@ -80,9 +80,8 @@ class MainWindow(QMainWindow):
         self.central_widget = TransparentWidget()
         self.setCentralWidget(self.central_widget)
         
-        # Connect to theme manager and set initial button text
+        # Connect to theme manager
         theme_manager.theme_changed.connect(self.on_theme_changed)
-        self._update_dark_mode_button_text()
         main_layout = QVBoxLayout(self.central_widget)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -110,6 +109,9 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.clear_bg_btn)
         button_layout.addWidget(self.dark_mode_btn)
         button_layout.addStretch()
+        
+        # Set initial button text after button is created
+        self._update_dark_mode_button_text()
         
         # Opacity slider
         slider_layout = QHBoxLayout()
