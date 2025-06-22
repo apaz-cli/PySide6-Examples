@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QFileSystemModel)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
-from styled_monaco_widget import StyledMonacoWidget
+from monaco_widget import StyledMonacoWidget
 from theme_manager import theme_manager
 
 

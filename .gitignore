@@ -1,0 +1,4 @@
+.aider*
+.venv/**
+**/monaco-editor/**
+**/__pycache__/**
