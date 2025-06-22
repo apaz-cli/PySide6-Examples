@@ -471,15 +471,14 @@ class AnalysisWidget(QWidget):
         overview.append(f'<h3 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">📋 Functions Overview</h3>')
         
         for func in analysis.functions:
-            func_name = func.name if func.name != "<module>" else "🏠 Main Module"
+            func_name = func.name if func.name != "<module>" else "Main Module"
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
                 <a href="#func_{func.name}" style="color: {type_colors["CALL"]}; text-decoration: none; font-weight: bold;">
                     {func_name}
                 </a>
                 <span style="color: {colors["text_secondary"]}; margin-left: 10px;">
-                    Args: {func.argcount}, Locals: {len(func.varnames)}, 
-                    Freevars: {len(func.freevars)}, Cellvars: {len(func.cellvars)}
+                    Args: {func.argcount}, Locals: {len(func.varnames)}
                 </span>
             </div>
             ''')
@@ -499,50 +498,18 @@ class AnalysisWidget(QWidget):
             listings.append(f'''
             <div style="margin-bottom: 15px; padding: 10px; background-color: {colors["background"].replace("120", "30")}; border-radius: 5px;">
                 <a name="func_{func.name}"></a>
-                <h4 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">🔧 {func_name}</h4>
+                <h4 style="color: {type_colors["CALL"]}; margin: 0 0 10px 0;">{func_name}</h4>
             ''')
             
-            # Local variables
+            # Local variables only
             if func.varnames:
-                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["LOAD"]};">📦 Local Variables:</strong><br>')
+                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["LOAD"]};">Variables:</strong><br>')
                 for i, var in enumerate(func.varnames):
                     listings.append(f'''
                     <a name="var_{var}_{func.name}"></a>
                     <a href="#var_usage_{var}" style="color: {type_colors["LOAD"]}; text-decoration: none; margin-right: 10px;" 
-                       title="Find all uses of {var}">🔵 {var}</a>
+                       title="Find all uses of {var}">{var}</a>
                     ''')
-                listings.append('</div>')
-            
-            # Free variables (nonlocals)
-            if func.freevars:
-                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["COMPARE"]};">🔗 Free Variables (nonlocals):</strong><br>')
-                for var in func.freevars:
-                    listings.append(f'''
-                    <a href="#var_usage_{var}" style="color: {type_colors["COMPARE"]}; text-decoration: none; margin-right: 10px;" 
-                       title="Find all uses of {var}">🟡 {var}</a>
-                    ''')
-                listings.append('</div>')
-            
-            # Cell variables
-            if func.cellvars:
-                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["BUILD"]};">📱 Cell Variables:</strong><br>')
-                for var in func.cellvars:
-                    listings.append(f'''
-                    <a href="#var_usage_{var}" style="color: {type_colors["BUILD"]}; text-decoration: none; margin-right: 10px;" 
-                       title="Find all uses of {var}">🟢 {var}</a>
-                    ''')
-                listings.append('</div>')
-            
-            # Global names
-            if func.names:
-                listings.append(f'<div style="margin: 5px 0;"><strong style="color: {type_colors["STORE"]};">🌐 Global Names:</strong><br>')
-                for name in func.names[:10]:  # Limit display
-                    listings.append(f'''
-                    <a href="#var_usage_{name}" style="color: {type_colors["STORE"]}; text-decoration: none; margin-right: 10px;" 
-                       title="Find all uses of {name}">🔴 {name}</a>
-                    ''')
-                if len(func.names) > 10:
-                    listings.append(f'<span style="color: {colors["text_secondary"]};">... and {len(func.names) - 10} more</span>')
                 listings.append('</div>')
             
             listings.append('</div>')
