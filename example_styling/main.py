@@ -8,6 +8,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 from monaco_widget import MonacoEditorWidget
 from file_explorer import FileExplorer
+from sandbox import SandboxWidget
 from theme_manager import theme_manager
 
 
@@ -143,6 +144,7 @@ class MainWindow(QMainWindow):
         # File Explorer section
         self.file_explorer = FileExplorer()
         self.file_explorer.content_ready.connect(self.load_file_content)
+        self.file_explorer.file_selected.connect(self.on_file_selected)
         
         # Monaco Editor section
         self.editor_group = QGroupBox("Monaco Editor")
@@ -157,26 +159,19 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self.monaco_editor)
         self.editor_group.setLayout(editor_layout)
         
-        # Placeholder section
-        self.placeholder_group = QGroupBox("Placeholder Panel")
-        self.placeholder_group.setObjectName("placeholder_group")
-        placeholder_layout = QVBoxLayout()
+        # Python Analysis section
+        self.analysis_group = QGroupBox("Python Analysis")
+        self.analysis_group.setObjectName("analysis_group")
+        analysis_layout = QVBoxLayout()
         
-        self.info_label = QLabel("This is a placeholder panel.\nFuture functionality will be added here.")
-        self.info_label.setWordWrap(True)
-        
-        self.placeholder_content = QLabel("Reserved for future features...")
-        self.placeholder_content.setAlignment(Qt.AlignCenter)
-        
-        placeholder_layout.addWidget(self.info_label)
-        placeholder_layout.addWidget(self.placeholder_content)
-        placeholder_layout.addStretch()
-        self.placeholder_group.setLayout(placeholder_layout)
+        self.sandbox_widget = SandboxWidget()
+        analysis_layout.addWidget(self.sandbox_widget)
+        self.analysis_group.setLayout(analysis_layout)
         
         # Add to content layout
         content_layout.addWidget(self.file_explorer, 1)
         content_layout.addWidget(self.editor_group, 2)
-        content_layout.addWidget(self.placeholder_group, 1)
+        content_layout.addWidget(self.analysis_group, 1)
         
         # Add all to main layout
         main_layout.addWidget(self.controls_group)
@@ -203,7 +198,7 @@ class MainWindow(QMainWindow):
         # Apply group box styles
         self.controls_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='primary'))
         self.editor_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='secondary'))
-        self.placeholder_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='accent'))
+        self.analysis_group.setStyleSheet(theme_manager.get_widget_style('group_box', border_color='accent'))
         
         # Apply button styles
         button_style = theme_manager.get_widget_style('button')
@@ -215,14 +210,15 @@ class MainWindow(QMainWindow):
         self.opacity_label.setStyleSheet(theme_manager.get_widget_style('text'))
         self.opacity_slider.setStyleSheet(theme_manager.get_widget_style('slider'))
         
-        # Apply placeholder styles
-        self.info_label.setStyleSheet(theme_manager.get_widget_style('label'))
-        self.placeholder_content.setStyleSheet(theme_manager.get_widget_style('placeholder'))
     
     def load_file_content(self, content, language):
         """Load file content into Monaco editor"""
         self.monaco_editor.set_content(content)
         self.monaco_editor.set_language(language)
+    
+    def on_file_selected(self, file_path):
+        """Handle file selection for analysis"""
+        self.sandbox_widget.analyze_file(file_path)
     
     def select_font(self):
         """Open font selection dialog"""
