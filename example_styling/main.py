@@ -96,19 +96,15 @@ class MainWindow(QMainWindow):
         
         self.load_bg_btn = QPushButton("Load Background Image")
         self.load_bg_btn.clicked.connect(self.load_background)
-        self.style_button(self.load_bg_btn)
         
         self.refresh_btn = QPushButton("Refresh WebView")
         self.refresh_btn.clicked.connect(self.refresh_webview)
-        self.style_button(self.refresh_btn)
         
         self.demo_btn = QPushButton("Load Demo Content")
         self.demo_btn.clicked.connect(self.load_demo_content)
-        self.style_button(self.demo_btn)
         
         self.clear_bg_btn = QPushButton("Clear Background")
         self.clear_bg_btn.clicked.connect(self.clear_background)
-        self.style_button(self.clear_bg_btn)
         
         self.dark_mode_btn = QPushButton("🌙 Dark Mode")
         self.dark_mode_btn.clicked.connect(theme_manager.toggle_dark_mode)
