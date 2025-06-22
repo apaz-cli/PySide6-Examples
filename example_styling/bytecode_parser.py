@@ -51,6 +51,7 @@ class FunctionInfo:
     """Information about a function in the bytecode"""
     name: str
     code_object: Any
+    function_object: Optional[Any]  # The actual callable function object
     start_offset: int
     end_offset: int
     varnames: List[str]  # Local variables
@@ -210,7 +211,7 @@ class BytecodeParser:
             main_function=None
         )
     
-    def analyze_code_object(self, code_obj, source_code: str = "") -> BytecodeAnalysis:
+    def analyze_code_object(self, code_obj, source_code: str = "", function_objects: Dict[str, Any] = None) -> BytecodeAnalysis:
         """Analyze a code object directly to get detailed function information"""
         functions = []
         all_instructions = []
@@ -220,12 +221,15 @@ class BytecodeParser:
         constants = set()
         function_calls = []
         
+        if function_objects is None:
+            function_objects = {}
+        
         # Analyze main code object
-        main_function = self._analyze_single_function(code_obj, "<module>", 0)
+        main_function = self._analyze_single_function(code_obj, "<module>", 0, function_objects.get("<module>"))
         functions.append(main_function)
         
         # Find nested functions by looking for LOAD_CONST instructions with code objects
-        self._find_nested_functions(code_obj, functions, len(main_function.instructions))
+        self._find_nested_functions(code_obj, functions, len(main_function.instructions), function_objects)
         
         # Collect all instructions and metadata
         for func in functions:
@@ -255,7 +259,7 @@ class BytecodeParser:
             main_function=main_function
         )
     
-    def _analyze_single_function(self, code_obj, name: str, offset_base: int) -> FunctionInfo:
+    def _analyze_single_function(self, code_obj, name: str, offset_base: int, function_object: Any = None) -> FunctionInfo:
         """Analyze a single function's code object"""
         instructions = []
         
@@ -281,6 +285,7 @@ class BytecodeParser:
         return FunctionInfo(
             name=name,
             code_object=code_obj,
+            function_object=function_object,
             start_offset=offset_base,
             end_offset=offset_base + len(instructions) * 2,  # Approximate
             varnames=list(code_obj.co_varnames),
@@ -293,16 +298,17 @@ class BytecodeParser:
             instructions=instructions
         )
     
-    def _find_nested_functions(self, code_obj, functions: List[FunctionInfo], offset_base: int):
+    def _find_nested_functions(self, code_obj, functions: List[FunctionInfo], offset_base: int, function_objects: Dict[str, Any]):
         """Recursively find nested functions in constants"""
         for const in code_obj.co_consts:
             if hasattr(const, 'co_code'):  # It's a code object
                 func_name = const.co_name
-                nested_func = self._analyze_single_function(const, func_name, offset_base)
+                func_obj = function_objects.get(func_name)
+                nested_func = self._analyze_single_function(const, func_name, offset_base, func_obj)
                 functions.append(nested_func)
                 
                 # Recursively find functions within this function
-                self._find_nested_functions(const, functions, offset_base + len(nested_func.instructions) * 2)
+                self._find_nested_functions(const, functions, offset_base + len(nested_func.instructions) * 2, function_objects)
                 offset_base += len(nested_func.instructions) * 2
     
     def _parse_instruction_line(self, line: str, jump_targets: Set[int]) -> Optional[BytecodeInstruction]:

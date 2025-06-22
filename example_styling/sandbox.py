@@ -68,9 +68,7 @@ class PythonAnalyzer(QObject):
                 
                 # Parse bytecode for analysis using code object
                 try:
-                    self.bytecode_analysis = self.bytecode_parser.analyze_code_object(compiled_code, source_code)
-                    # Pass function objects for signature inspection
-                    self.bytecode_analysis.function_objects = self.function_objects
+                    self.bytecode_analysis = self.bytecode_parser.analyze_code_object(compiled_code, source_code, self.function_objects)
                     bytecode_summary = self.bytecode_parser.format_analysis_summary(self.bytecode_analysis)
                 except Exception as e:
                     # Fallback to old method
@@ -496,11 +494,13 @@ class SandboxWidget(QWidget):
             func_name = func.name if func.name != "<module>" else "Main Module"
             
             # Build signature using inspect.signature if function object is available
-            if func.name == "<module>":
-                signature = "(module)"
-            else:
-                sig = inspect.signature(func.code_object)
-                signature = str(sig)
+            signature = "(module)" if func.name == "<module>" else "(signature unavailable)"
+            if func.function_object is not None:
+                try:
+                    sig = inspect.signature(func.function_object)
+                    signature = str(sig)
+                except Exception:
+                    signature = "(signature unavailable)"
             
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
