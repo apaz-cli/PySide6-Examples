@@ -494,7 +494,16 @@ class SandboxWidget(QWidget):
         
         for func in analysis.functions:
             func_name = func.name if func.name != "<module>" else "Main Module"
-            signature = self._build_function_signature(func)
+            
+            # Build signature using inspect.signature if function object is available
+            signature = "(module)" if func.name == "<module>" else "(signature unavailable)"
+            if hasattr(analysis, 'function_objects') and func.name in analysis.function_objects:
+                try:
+                    func_obj = analysis.function_objects[func.name]
+                    sig = inspect.signature(func_obj)
+                    signature = str(sig)
+                except Exception:
+                    signature = "(signature unavailable)"
             
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
@@ -655,15 +664,6 @@ class SandboxWidget(QWidget):
                 return func.name
         return None
     
-    def _build_function_signature(self, func):
-        """Build a function signature string from function info"""
-        if func.name == "<module>":
-            return "(module)"
-        
-        # Use inspect.signature() if we have the function object
-        func_obj = self.analyzer.function_objects[func.name]
-        sig = inspect.signature(func_obj)
-        return str(sig)
     
     def _create_enhanced_tooltip(self, instruction, analysis):
         """Create enhanced tooltip with context information"""
