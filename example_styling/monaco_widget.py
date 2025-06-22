@@ -232,7 +232,15 @@ class MonacoEditorWidget(QWidget):
                             'editorGutter.background': '#00000000',
                             'editorWidget.background': '#2d2d30cc',
                             'editorSuggestWidget.background': '#2d2d30cc',
-                            'editorHoverWidget.background': '#2d2d30cc'
+                            'editorHoverWidget.background': '#2d2d30cc',
+                            'scrollbar.shadow': '#00000000',
+                            'scrollbarSlider.background': '#79797966',
+                            'scrollbarSlider.hoverBackground': '#646464b3',
+                            'scrollbarSlider.activeBackground': '#bfbfbf66',
+                            'minimap.background': '#00000000',
+                            'minimapSlider.background': '#79797966',
+                            'minimapSlider.hoverBackground': '#646464b3',
+                            'minimapSlider.activeBackground': '#bfbfbf66'
                         }}
                     }});
                     
@@ -247,7 +255,15 @@ class MonacoEditorWidget(QWidget):
                             'editorGutter.background': '#00000000',
                             'editorWidget.background': '#f3f3f3cc',
                             'editorSuggestWidget.background': '#f3f3f3cc',
-                            'editorHoverWidget.background': '#f3f3f3cc'
+                            'editorHoverWidget.background': '#f3f3f3cc',
+                            'scrollbar.shadow': '#00000000',
+                            'scrollbarSlider.background': '#64646466',
+                            'scrollbarSlider.hoverBackground': '#646464b3',
+                            'scrollbarSlider.activeBackground': '#00000066',
+                            'minimap.background': '#00000000',
+                            'minimapSlider.background': '#64646466',
+                            'minimapSlider.hoverBackground': '#646464b3',
+                            'minimapSlider.activeBackground': '#00000066'
                         }}
                     }});
                     
