@@ -9,11 +9,26 @@ import io
 import sys
 import inspect
 from pathlib import Path
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal, QObject, QThread
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, QTextBrowser,
                                QLabel, QScrollArea)
 from theme_manager import theme_manager
 from bytecode_parser import BytecodeParser
+
+
+class AnalysisWorker(QThread):
+    """Worker thread for analysis operations"""
+    analysis_complete = Signal(object)  # AnalysisResult
+    
+    def __init__(self, api_client, file_path, analyzer_type):
+        super().__init__()
+        self.api_client = api_client
+        self.file_path = file_path
+        self.analyzer_type = analyzer_type
+    
+    def run(self):
+        result = self.api_client.analyze_file(self.file_path, self.analyzer_type)
+        self.analysis_complete.emit(result)
 
 
 class PythonAnalyzer(QObject):

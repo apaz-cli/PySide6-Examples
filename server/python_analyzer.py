@@ -9,6 +9,7 @@ import io
 import sys
 import inspect
 from pathlib import Path
+from typing import List
 from analyzer_base import AnalyzerBase, AnalysisResult
 from bytecode_parser import BytecodeParser
 
