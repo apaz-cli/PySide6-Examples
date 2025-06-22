@@ -247,7 +247,6 @@ class SandboxWidget(QWidget):
     
     def connect_signals(self):
         """Connect signals"""
-        self.analyzer.analysis_ready.connect(self.display_analysis)
         theme_manager.theme_changed.connect(self.apply_theme)
     
     def analyze_file(self, file_path):
@@ -259,29 +258,27 @@ class SandboxWidget(QWidget):
         file_path = Path(file_path)
         self.current_file = file_path
         
-        # Determine file type and language
-        language = self.detect_language(file_path)
-        self.current_language = language
+        # Check which analyzers can handle this file
+        compatible_analyzers = self.api_client.can_analyze(str(file_path))
         
-        if language == 'python':
-            self.status_label.setText(f"Analyzing Python: {file_path.name}")
-            self.main_tab_widget.setCurrentWidget(self.python_tab_widget)
-            self.analyzer.analyze_file(str(file_path))
-        elif language == 'cpp':
-            self.status_label.setText(f"Analyzing C/C++: {file_path.name}")
-            self.main_tab_widget.setCurrentWidget(self.cpp_tab_widget)
-            self.analyze_cpp_file(file_path)
-        elif language == 'rust':
-            self.status_label.setText(f"Analyzing Rust: {file_path.name}")
-            self.main_tab_widget.setCurrentWidget(self.rust_tab_widget)
-            self.analyze_rust_file(file_path)
-        elif language == 'triton':
-            self.status_label.setText(f"Analyzing Triton: {file_path.name}")
-            self.main_tab_widget.setCurrentWidget(self.triton_tab_widget)
-            self.analyze_triton_file(file_path)
-        else:
+        if not compatible_analyzers:
             self.clear_analysis()
-            self.status_label.setText(f"Unsupported file type: {file_path.name}")
+            self.status_label.setText(f"No analyzer available for: {file_path.name}")
+            return
+        
+        # Use the first compatible analyzer (could be made configurable)
+        analyzer_type = compatible_analyzers[0]
+        
+        # Set appropriate tab based on analyzer type
+        if analyzer_type == 'python':
+            self.main_tab_widget.setCurrentWidget(self.python_tab_widget)
+        
+        self.status_label.setText(f"Analyzing {file_path.name} with {analyzer_type}...")
+        
+        # Start analysis in worker thread
+        self.worker = AnalysisWorker(self.api_client, str(file_path), analyzer_type)
+        self.worker.analysis_complete.connect(self.on_analysis_complete)
+        self.worker.start()
     
     def detect_language(self, file_path):
         """Detect programming language from file extension"""

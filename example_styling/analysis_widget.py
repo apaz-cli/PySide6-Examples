@@ -3,28 +3,39 @@ Multi-language Code Analysis Widget
 Provides AST parsing, bytecode disassembly, and analysis for multiple programming languages.
 """
 
-import ast
-import dis
-import io
-import sys
 from pathlib import Path
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal, QObject, QThread
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, QTextBrowser,
                                QLabel, QScrollArea)
 from theme_manager import theme_manager
-from bytecode_parser import BytecodeParser
-from sandbox import PythonAnalyzer
+from api_client import AnalysisClient, AnalysisResult
 
+
+
+class AnalysisWorker(QThread):
+    """Worker thread for analysis operations"""
+    analysis_complete = Signal(object)  # AnalysisResult
+    
+    def __init__(self, api_client, file_path, analyzer_type):
+        super().__init__()
+        self.api_client = api_client
+        self.file_path = file_path
+        self.analyzer_type = analyzer_type
+    
+    def run(self):
+        result = self.api_client.analyze_file(self.file_path, self.analyzer_type)
+        self.analysis_complete.emit(result)
 
 
 class AnalysisWidget(QWidget):
     """Multi-language code analysis widget"""
     
-    def __init__(self, parent=None):
+    def __init__(self, api_client: AnalysisClient, parent=None):
         super().__init__(parent)
+        self.api_client = api_client
         self.current_file = None
         self.current_language = None
-        self.analyzer = PythonAnalyzer()
+        self.worker = None
         self.setup_ui()
         self.connect_signals()
         self.apply_theme()
@@ -246,50 +257,45 @@ class AnalysisWidget(QWidget):
         self.triton_perf_text.setPlainText("Triton performance analysis not yet implemented")
         self.error_text.setPlainText("Triton analysis coming soon")
     
-    def display_analysis(self, ast_result, dis_result, bytecode_summary, errors):
-        """Display analysis results in tabs"""
-        # Update AST tab
-        if ast_result:
-            self.ast_text.setPlainText(ast_result)
-        else:
-            self.ast_text.setPlainText("No AST data available")
+    def on_analysis_complete(self, result: AnalysisResult):
+        """Handle analysis completion"""
+        if not result:
+            self.status_label.setText("Analysis failed - no result")
+            return
         
-        # Update disassembly tab with custom rich formatting
+        if not result.success:
+            self.error_text.setPlainText('\n'.join(result.errors))
+            self.status_label.setText(f"Analysis failed: {self.current_file.name}")
+            return
+        
+        # Display results based on analyzer type
+        if result.analyzer_type == 'python':
+            self.display_python_analysis(result)
+        
+        self.status_label.setText(f"Analysis complete: {self.current_file.name}")
+    
+    def display_python_analysis(self, result: AnalysisResult):
+        """Display Python analysis results"""
+        data = result.data
+        
+        # Update AST tab
+        self.ast_text.setPlainText(data.get('ast', 'No AST data available'))
+        
+        # Update disassembly tab
+        dis_result = data.get('disassembly', '')
         if dis_result:
-            try:
-                # Use the analysis from analyzer which has detailed function info
-                if hasattr(self.analyzer, 'bytecode_analysis'):
-                    self.bytecode_analysis = self.analyzer.bytecode_analysis
-                else:
-                    # Fallback to parsing dis output
-                    self.bytecode_analysis = self.analyzer.bytecode_parser.parse_disassembly(dis_result)
-                
-                formatted_html = self.create_enhanced_bytecode_display(self.bytecode_analysis)
-                self.dis_text.setHtml(formatted_html)
-            except Exception as e:
-                # Fallback to plain text if formatting fails
-                self.dis_text.setPlainText(f"Error parsing bytecode: {str(e)}\n\nRaw output:\n{dis_result}")
+            self.dis_text.setPlainText(dis_result)  # Simplified for now
         else:
             self.dis_text.setPlainText("No disassembly data available")
-            self.bytecode_analysis = None
         
         # Update analysis tab
-        if bytecode_summary:
-            self.analysis_text.setPlainText(bytecode_summary)
-        else:
-            self.analysis_text.setPlainText("No bytecode analysis available")
+        self.analysis_text.setPlainText(data.get('analysis_summary', 'No analysis available'))
         
         # Update errors tab
-        if errors:
-            self.error_text.setPlainText(errors)
-            # Switch to errors tab if there are errors
-            self.tab_widget.setCurrentIndex(3)
+        if result.errors:
+            self.error_text.setPlainText('\n'.join(result.errors))
         else:
             self.error_text.setPlainText("No errors detected")
-        
-        # Update status
-        if self.current_file:
-            self.status_label.setText(f"Python analysis complete: {self.current_file.name}")
     
     def clear_analysis(self):
         """Clear all analysis results"""

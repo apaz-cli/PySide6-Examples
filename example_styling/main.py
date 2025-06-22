@@ -3,7 +3,7 @@ import os
 from PySide6.QtCore import Qt, QUrl, QTimer, QDir, QFileInfo
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QLabel, QTextEdit,
-                               QGroupBox, QSlider, QFileDialog, QFontDialog)
+                               QGroupBox, QSlider, QFileDialog, QFontDialog, QMessageBox)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 from monaco_widget import MonacoEditorWidget
@@ -11,6 +11,7 @@ from file_explorer import FileExplorer
 from analysis_widget import AnalysisWidget
 from theme_manager import theme_manager
 from settings import settings_manager
+from api_client import AnalysisClient
 
 
 class BackgroundWidget(QWidget):
@@ -76,6 +77,16 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PerfWizard")
+        
+        # Initialize API client
+        self.api_client = AnalysisClient()
+        
+        # Check server connection
+        if not self.api_client.health_check():
+            QMessageBox.warning(
+                self, "Server Connection", 
+                "Could not connect to analysis server. Some features may not work."
+            )
         
         # Load settings first
         self._load_settings()
@@ -174,7 +185,7 @@ class MainWindow(QMainWindow):
         self.analysis_group.setObjectName("analysis_group")
         analysis_layout = QVBoxLayout()
         
-        self.analysis_widget = AnalysisWidget()
+        self.analysis_widget = AnalysisWidget(self.api_client)
         analysis_layout.addWidget(self.analysis_widget)
         self.analysis_group.setLayout(analysis_layout)
         
