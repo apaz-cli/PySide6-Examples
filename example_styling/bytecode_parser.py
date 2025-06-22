@@ -53,7 +53,6 @@ class FunctionInfo:
     code_object: Any
     function_object: Optional[Any]  # The actual callable function object
     start_offset: int
-    end_offset: int
     varnames: List[str]  # Local variables
     names: List[str]     # Global names
     freevars: List[str]  # Free variables (nonlocals)
@@ -75,29 +74,16 @@ class BytecodeAnalysis:
     functions: List[FunctionInfo]  # All functions found in the code
     main_function: Optional[FunctionInfo]  # The main module function
     
-    @property
-    def loads(self) -> List[BytecodeInstruction]:
-        """Get all load instructions"""
-        return [instr for instr in self.instructions if instr.instruction_type == InstructionType.LOAD]
-    
-    @property
-    def stores(self) -> List[BytecodeInstruction]:
-        """Get all store instructions"""
-        return [instr for instr in self.instructions if instr.instruction_type == InstructionType.STORE]
-    
-    @property
-    def calls(self) -> List[BytecodeInstruction]:
-        """Get all call instructions"""
-        return [instr for instr in self.instructions if instr.instruction_type == InstructionType.CALL]
-    
-    @property
-    def jumps(self) -> List[BytecodeInstruction]:
-        """Get all jump instructions"""
-        return [instr for instr in self.instructions if instr.instruction_type == InstructionType.JUMP]
 
 
 class BytecodeParser:
     """Parses dis.dis() output into structured data"""
+    
+    METADATA_EXTRACTORS = {
+        ('LOAD_FAST', 'STORE_FAST'): 'local_vars',
+        ('LOAD_GLOBAL', 'STORE_GLOBAL'): 'global_vars',
+        ('LOAD_CONST',): 'constants'
+    }
     
     INSTRUCTION_TYPES = {
         InstructionType.LOAD: {
@@ -155,28 +141,17 @@ class BytecodeParser:
         lines = dis_output.strip().split('\n')
         jump_targets = self._extract_jump_targets(lines)
         
-        instructions = []
-        local_vars = set()
-        global_vars = set()
-        constants = set()
-        function_calls = []
+        analysis = self._create_base_analysis()
+        analysis.jump_targets = jump_targets
         
         for line in lines:
             instruction = self._parse_instruction_line(line, jump_targets)
             if instruction:
-                instructions.append(instruction)
-                self._extract_metadata(instruction, local_vars, global_vars, constants, function_calls)
+                analysis.instructions.append(instruction)
+                self._extract_metadata(instruction, analysis.local_vars, analysis.global_vars, 
+                                     analysis.constants, analysis.function_calls)
         
-        return BytecodeAnalysis(
-            instructions=instructions,
-            jump_targets=jump_targets,
-            local_vars=local_vars,
-            global_vars=global_vars,
-            constants=constants,
-            function_calls=function_calls,
-            functions=[],
-            main_function=None
-        )
+        return analysis
     
     def analyze_code_object(self, code_obj, source_code: str = "", function_objects: Dict[str, Any] = None) -> BytecodeAnalysis:
         """Analyze a code object directly to get detailed function information"""
@@ -219,7 +194,6 @@ class BytecodeParser:
             code_object=code_obj,
             function_object=function_object,
             start_offset=offset_base,
-            end_offset=offset_base + len(instructions) * 2,  # Approximate
             varnames=list(code_obj.co_varnames),
             names=list(code_obj.co_names),
             freevars=list(code_obj.co_freevars),
@@ -259,13 +233,24 @@ class BytecodeParser:
         try:
             offset = int(parts[0])
             opname = parts[1]
+            arg = int(parts[2]) if len(parts) > 2 else None
         except (ValueError, IndexError):
             return None
         
-        line_number = self._extract_line_number(line)
-        arg = self._extract_arg(parts)
         argrepr = ' '.join(parts[3:]) if len(parts) > 3 else ""
-        argval = self._extract_argval(argrepr)
+        
+        # Extract line number and argval inline
+        line_number = None
+        if '(' in line and ')' in line:
+            match = re.search(r'\((\d+)\)', line)
+            if match:
+                line_number = int(match.group(1))
+        
+        argval = None
+        if '(' in argrepr and ')' in argrepr:
+            match = re.search(r'\(([^)]+)\)', argrepr)
+            if match:
+                argval = match.group(1)
         
         return BytecodeInstruction(
             offset=offset,
@@ -284,14 +269,19 @@ class BytecodeParser:
         """Extract variable names, constants, and function calls from instruction"""
         if not instruction.argval:
             return
-            
-        if instruction.opname in ['LOAD_FAST', 'STORE_FAST']:
-            local_vars.add(instruction.argval)
-        elif instruction.opname in ['LOAD_GLOBAL', 'STORE_GLOBAL']:
-            global_vars.add(instruction.argval)
-        elif instruction.opname == 'LOAD_CONST':
-            constants.add(instruction.argval)
-        elif instruction.instruction_type == InstructionType.CALL:
+        
+        # Use lookup table for metadata extraction
+        for opcodes, var_type in self.METADATA_EXTRACTORS.items():
+            if instruction.opname in opcodes:
+                if var_type == 'local_vars':
+                    local_vars.add(instruction.argval)
+                elif var_type == 'global_vars':
+                    global_vars.add(instruction.argval)
+                elif var_type == 'constants':
+                    constants.add(instruction.argval)
+                return
+        
+        if instruction.instruction_type == InstructionType.CALL:
             function_calls.append(instruction.argval)
     
     def format_analysis_summary(self, analysis: BytecodeAnalysis) -> str:
@@ -326,14 +316,15 @@ class BytecodeParser:
                 summary.append(f"  ... and {len(analysis.function_calls) - 10} more")
         
         # Add jump analysis
-        if analysis.jumps:
+        jumps = [i for i in analysis.instructions if i.instruction_type == InstructionType.JUMP]
+        if jumps:
             summary.append("")
             summary.append(f"🔀 Jump Analysis:")
-            summary.append(f"  Total Jumps: {len(analysis.jumps)}")
+            summary.append(f"  Total Jumps: {len(jumps)}")
             
             # Group jumps by type
             jump_types = {}
-            for jump in analysis.jumps:
+            for jump in jumps:
                 jump_types[jump.opname] = jump_types.get(jump.opname, 0) + 1
             
             for jump_type, count in sorted(jump_types.items()):
@@ -347,9 +338,21 @@ class BytecodeParser:
         
         return '\n'.join(summary)
     
+    def _create_base_analysis(self) -> BytecodeAnalysis:
+        """Create a base BytecodeAnalysis with empty collections"""
+        return BytecodeAnalysis(
+            instructions=[],
+            jump_targets=set(),
+            local_vars=set(),
+            global_vars=set(),
+            constants=set(),
+            function_calls=[],
+            functions=[],
+            main_function=None
+        )
+    
     def _calculate_cyclomatic_complexity(self, analysis: BytecodeAnalysis) -> int:
         """Calculate approximate cyclomatic complexity from bytecode"""
-        # Count decision points (jumps + 1)
         decision_points = len([instr for instr in analysis.instructions 
                              if instr.opname in ['POP_JUMP_IF_TRUE', 'POP_JUMP_IF_FALSE', 
                                                'JUMP_IF_TRUE_OR_POP', 'JUMP_IF_FALSE_OR_POP']])
@@ -364,28 +367,6 @@ class BytecodeParser:
                 if match:
                     jump_targets.add(int(match.group(1)))
         return jump_targets
-    
-    def _extract_line_number(self, line: str) -> Optional[int]:
-        """Extract line number from instruction line"""
-        line_match = re.search(r'\((\d+)\)', line)
-        return int(line_match.group(1)) if line_match else None
-    
-    def _extract_arg(self, parts: List[str]) -> Optional[int]:
-        """Extract argument from instruction parts"""
-        if len(parts) > 2:
-            try:
-                return int(parts[2])
-            except ValueError:
-                pass
-        return None
-    
-    def _extract_argval(self, argrepr: str) -> Optional[str]:
-        """Extract argument value from argument representation"""
-        if '(' in argrepr and ')' in argrepr:
-            argval_match = re.search(r'\(([^)]+)\)', argrepr)
-            if argval_match:
-                return argval_match.group(1)
-        return None
     
     def _build_analysis_from_functions(self, functions: List[FunctionInfo], main_function: FunctionInfo) -> BytecodeAnalysis:
         """Build BytecodeAnalysis from function list"""
@@ -421,8 +402,8 @@ class BytecodeParser:
     
     def _calculate_load_store_ratio(self, analysis: BytecodeAnalysis) -> str:
         """Calculate ratio of load to store operations"""
-        loads = len(analysis.loads)
-        stores = len(analysis.stores)
+        loads = len([i for i in analysis.instructions if i.instruction_type == InstructionType.LOAD])
+        stores = len([i for i in analysis.instructions if i.instruction_type == InstructionType.STORE])
         
         if stores == 0:
             return f"{loads}:0 (all loads)" if loads > 0 else "0:0"
