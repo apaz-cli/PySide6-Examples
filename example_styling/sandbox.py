@@ -143,10 +143,12 @@ class SandboxWidget(QWidget):
         self.ast_text.setPlainText("Select a Python file to see its AST representation")
         self.tab_widget.addTab(self.ast_text, "🌳 AST")
         
-        # Disassembly tab
+        # Disassembly tab - custom rich bytecode display
         self.dis_text = QTextEdit()
         self.dis_text.setReadOnly(True)
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
+        self.dis_text.setOpenExternalLinks(False)
+        self.dis_text.anchorClicked.connect(self.handle_bytecode_link)
         self.tab_widget.addTab(self.dis_text, "⚙️ Bytecode")
         
         # Analysis tab
@@ -192,22 +194,19 @@ class SandboxWidget(QWidget):
         else:
             self.ast_text.setPlainText("No AST data available")
         
-        # Update disassembly tab with enhanced formatting
+        # Update disassembly tab with custom rich formatting
         if dis_result:
             try:
-                # Parse and format the bytecode with colors and links
-                bytecode_analysis = self.analyzer.bytecode_parser.parse_disassembly(dis_result)
-                formatted_html = self.format_bytecode_html(bytecode_analysis)
+                # Parse and format the bytecode with our custom display
+                self.bytecode_analysis = self.analyzer.bytecode_parser.parse_disassembly(dis_result)
+                formatted_html = self.create_rich_bytecode_display(self.bytecode_analysis)
                 self.dis_text.setHtml(formatted_html)
-                
-                # Enable link clicking for jumps
-                self.dis_text.setOpenExternalLinks(False)
-                self.dis_text.anchorClicked.connect(self.handle_jump_click)
             except Exception as e:
                 # Fallback to plain text if formatting fails
-                self.dis_text.setPlainText(dis_result)
+                self.dis_text.setPlainText(f"Error parsing bytecode: {str(e)}\n\nRaw output:\n{dis_result}")
         else:
             self.dis_text.setPlainText("No disassembly data available")
+            self.bytecode_analysis = None
         
         # Update analysis tab
         if bytecode_summary:
@@ -230,110 +229,279 @@ class SandboxWidget(QWidget):
     def clear_analysis(self):
         """Clear all analysis results"""
         self.current_file = None
+        self.bytecode_analysis = None
         self.ast_text.setPlainText("Select a Python file to see its AST representation")
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
         self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
         self.error_text.setPlainText("No errors")
         self.status_label.setText("No Python file selected")
     
-    def format_bytecode_html(self, bytecode_analysis):
-        """Format bytecode with HTML colors and clickable jump links"""
+    def create_rich_bytecode_display(self, bytecode_analysis):
+        """Create rich HTML display of bytecode with navigation links"""
         colors = theme_manager.get_colors()
-        
-        # Color scheme for different instruction types
-        color_map = {
-            'LOAD': colors['primary'],      # Blue for loads
-            'STORE': colors['accent'],      # Red for stores  
-            'CALL': colors['secondary'],    # Green for calls
-            'JUMP': '#f39c12',             # Orange for jumps
-            'COMPARE': '#9b59b6',          # Purple for comparisons
-            'BINARY_OP': '#e67e22',        # Orange for binary ops
-            'BUILD': '#1abc9c',            # Teal for build ops
-            'RETURN': '#e74c3c',           # Red for returns
-            'LOOP': '#f1c40f',             # Yellow for loops
-            'OTHER': colors['text_secondary']  # Gray for others
-        }
-        
-        lines = []
-        
-        for instruction in bytecode_analysis.instructions:
-            # Format the instruction line
-            target_marker = "&gt;&gt;" if instruction.is_jump_target else "&nbsp;&nbsp;"
-            
-            # Add anchor for jump targets
-            anchor = ""
-            if instruction.is_jump_target:
-                anchor = f'<a name="offset_{instruction.offset}"></a>'
-            
-            # Color based on instruction type
-            color = color_map.get(instruction.instruction_type.name, color_map['OTHER'])
-            
-            # Format line number if present
-            line_info = f"({instruction.line_number:3d})" if instruction.line_number else "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-            
-            # Format the instruction
-            if instruction.arg is not None:
-                instr_text = f"{instruction.offset:4d} {instruction.opname:<20} {instruction.arg:4d}"
-                if instruction.argrepr:
-                    instr_text += f" {instruction.argrepr}"
-            else:
-                instr_text = f"{instruction.offset:4d} {instruction.opname:<20}"
-            
-            # Make jump targets clickable
-            if instruction.instruction_type.name == 'JUMP' and instruction.argrepr:
-                # Extract target offset from argrepr
-                import re
-                target_match = re.search(r'(\d+)', instruction.argrepr)
-                if target_match:
-                    target_offset = target_match.group(1)
-                    if int(target_offset) in bytecode_analysis.jump_targets:
-                        # Make the target offset clickable
-                        instr_text = instr_text.replace(
-                            target_offset,
-                            f'<a href="#offset_{target_offset}" style="color: {color}; text-decoration: underline;">{target_offset}</a>'
-                        )
-            
-            # Highlight jump targets
-            if instruction.is_jump_target:
-                line_style = f'style="background-color: {colors["hover"]}; font-weight: bold;"'
-            else:
-                line_style = ""
-            
-            formatted_line = f'<span {line_style}>{anchor}{target_marker} {line_info} <span style="color: {color};">{instr_text}</span></span>'
-            lines.append(formatted_line)
-        
-        # Wrap in pre tag with monospace font
         font_family = theme_manager.current_font_family
         font_size = max(7.5, theme_manager.current_font_size * 0.8)
         
+        # Color scheme for different instruction types
+        type_colors = {
+            'LOAD': colors['primary'],
+            'STORE': colors['accent'], 
+            'CALL': colors['secondary'],
+            'JUMP': '#f39c12',
+            'COMPARE': '#9b59b6',
+            'BINARY_OP': '#e67e22',
+            'BUILD': '#1abc9c',
+            'RETURN': '#e74c3c',
+            'LOOP': '#f1c40f',
+            'OTHER': colors['text_secondary']
+        }
+        
+        # Build navigation links section
+        nav_links = self._build_navigation_links(bytecode_analysis, type_colors)
+        
+        # Build instruction display
+        instruction_lines = []
+        
+        for i, instruction in enumerate(bytecode_analysis.instructions):
+            # Create anchor for this instruction
+            anchor = f'<a name="instr_{i}"></a>'
+            
+            # Jump target marker
+            target_marker = "&gt;&gt;" if instruction.is_jump_target else "&nbsp;&nbsp;"
+            if instruction.is_jump_target:
+                anchor += f'<a name="offset_{instruction.offset}"></a>'
+            
+            # Line number
+            line_info = f"({instruction.line_number:3d})" if instruction.line_number else "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            
+            # Instruction color
+            instr_color = type_colors.get(instruction.instruction_type.name, type_colors['OTHER'])
+            
+            # Format instruction parts
+            offset_part = f'<span style="color: {colors["text_secondary"]};">{instruction.offset:4d}</span>'
+            opname_part = f'<span style="color: {instr_color}; font-weight: bold;">{instruction.opname}</span>'
+            
+            # Argument and representation
+            arg_part = ""
+            if instruction.arg is not None:
+                arg_part = f'<span style="color: {colors["text"]};">{instruction.arg:4d}</span>'
+            
+            argrepr_part = ""
+            if instruction.argrepr:
+                argrepr_text = instruction.argrepr
+                
+                # Make variable names clickable
+                if instruction.instruction_type.name in ['LOAD', 'STORE'] and instruction.argval:
+                    var_name = instruction.argval
+                    argrepr_text = argrepr_text.replace(
+                        var_name,
+                        f'<a href="#var_{var_name}" style="color: {instr_color}; text-decoration: underline;" title="Find all uses of {var_name}">{var_name}</a>'
+                    )
+                
+                # Make jump targets clickable
+                elif instruction.instruction_type.name == 'JUMP':
+                    import re
+                    target_match = re.search(r'(\d+)', instruction.argrepr)
+                    if target_match:
+                        target_offset = target_match.group(1)
+                        if int(target_offset) in bytecode_analysis.jump_targets:
+                            argrepr_text = argrepr_text.replace(
+                                target_offset,
+                                f'<a href="#offset_{target_offset}" style="color: {instr_color}; text-decoration: underline;" title="Jump to offset {target_offset}">{target_offset}</a>'
+                            )
+                
+                # Make function calls clickable
+                elif instruction.instruction_type.name == 'CALL' and instruction.argval:
+                    func_name = instruction.argval
+                    argrepr_text = argrepr_text.replace(
+                        func_name,
+                        f'<a href="#call_{func_name}" style="color: {instr_color}; text-decoration: underline;" title="Find all calls to {func_name}">{func_name}</a>'
+                    )
+                
+                argrepr_part = f'<span style="color: {colors["text"]};">({argrepr_text})</span>'
+            
+            # Combine parts
+            line_content = f"{target_marker} {line_info} {offset_part} {opname_part:<20}"
+            if arg_part:
+                line_content += f" {arg_part}"
+            if argrepr_part:
+                line_content += f" {argrepr_part}"
+            
+            # Add hover tooltip with instruction details
+            tooltip = self._create_instruction_tooltip(instruction)
+            
+            # Highlight jump targets
+            line_style = ""
+            if instruction.is_jump_target:
+                line_style = f'background-color: {colors["hover"]}; padding: 2px; border-radius: 3px;'
+            
+            formatted_line = f'<div style="{line_style}" title="{tooltip}">{anchor}{line_content}</div>'
+            instruction_lines.append(formatted_line)
+        
+        # Combine navigation and instructions
         html = f'''
-        <pre style="font-family: '{font_family}', monospace; font-size: {font_size}pt; 
-                   line-height: 1.2; margin: 0; padding: 10px;
-                   background-color: transparent; color: {colors['text']};">
-        {'<br>'.join(lines)}
-        </pre>
+        <div style="font-family: '{font_family}', monospace; font-size: {font_size}pt; 
+                    line-height: 1.4; color: {colors['text']}; background: transparent;">
+            {nav_links}
+            <hr style="border: 1px solid {colors['border']}; margin: 15px 0;">
+            <div style="white-space: pre-wrap;">
+                {''.join(instruction_lines)}
+            </div>
+        </div>
         '''
         
         return html
     
-    def handle_jump_click(self, url):
-        """Handle clicking on jump links"""
-        anchor = url.toString()
-        if anchor.startswith('#offset_'):
-            # Find the anchor and scroll to it
-            cursor = self.dis_text.textCursor()
-            cursor.movePosition(cursor.Start)
+    def _build_navigation_links(self, analysis, type_colors):
+        """Build navigation links section"""
+        colors = theme_manager.get_colors()
+        links = []
+        
+        # Quick stats
+        stats = f'''
+        <div style="margin-bottom: 10px; padding: 8px; background-color: {colors['background'].replace('120', '60')}; border-radius: 5px;">
+            <strong>📊 Quick Stats:</strong> 
+            {len(analysis.instructions)} instructions, 
+            {len(analysis.jump_targets)} jump targets, 
+            {len(analysis.local_vars)} locals, 
+            {len(analysis.global_vars)} globals
+        </div>
+        '''
+        links.append(stats)
+        
+        # Jump targets
+        if analysis.jump_targets:
+            jump_links = []
+            for target in sorted(analysis.jump_targets):
+                jump_links.append(f'<a href="#offset_{target}" style="color: {type_colors["JUMP"]}; text-decoration: none; margin-right: 8px;" title="Jump to offset {target}">@{target}</a>')
             
-            # Search for the anchor
-            if self.dis_text.find(anchor.replace('#', '')):
-                self.dis_text.ensureCursorVisible()
-                # Highlight the target line briefly
-                self.highlight_jump_target()
+            jumps_section = f'''
+            <div style="margin-bottom: 8px;">
+                <strong style="color: {type_colors['JUMP']};">🔀 Jump Targets:</strong> 
+                {' '.join(jump_links)}
+            </div>
+            '''
+            links.append(jumps_section)
+        
+        # Variables
+        if analysis.local_vars or analysis.global_vars:
+            var_links = []
+            
+            for var in sorted(analysis.local_vars):
+                var_links.append(f'<a href="#var_{var}" style="color: {type_colors["LOAD"]}; text-decoration: none; margin-right: 8px;" title="Find uses of local variable {var}">🔵{var}</a>')
+            
+            for var in sorted(analysis.global_vars):
+                var_links.append(f'<a href="#var_{var}" style="color: {type_colors["STORE"]}; text-decoration: none; margin-right: 8px;" title="Find uses of global variable {var}">🔴{var}</a>')
+            
+            if var_links:
+                vars_section = f'''
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: {colors['text']};">📦 Variables:</strong> 
+                    {' '.join(var_links)}
+                </div>
+                '''
+                links.append(vars_section)
+        
+        # Function calls
+        unique_calls = list(set(analysis.function_calls))
+        if unique_calls:
+            call_links = []
+            for call in sorted(unique_calls)[:10]:  # Limit to first 10
+                call_links.append(f'<a href="#call_{call}" style="color: {type_colors["CALL"]}; text-decoration: none; margin-right: 8px;" title="Find calls to {call}">📞{call}</a>')
+            
+            calls_section = f'''
+            <div style="margin-bottom: 8px;">
+                <strong style="color: {type_colors['CALL']};">📞 Function Calls:</strong> 
+                {' '.join(call_links)}
+            </div>
+            '''
+            links.append(calls_section)
+        
+        return ''.join(links)
     
-    def highlight_jump_target(self):
-        """Briefly highlight the jump target"""
-        # This could be enhanced with a timer to remove highlight
-        pass
+    def _create_instruction_tooltip(self, instruction):
+        """Create tooltip text for an instruction"""
+        tooltip_parts = [
+            f"Offset: {instruction.offset}",
+            f"Opcode: {instruction.opname}",
+            f"Type: {instruction.instruction_type.value.title()}"
+        ]
+        
+        if instruction.line_number:
+            tooltip_parts.append(f"Source Line: {instruction.line_number}")
+        
+        if instruction.arg is not None:
+            tooltip_parts.append(f"Argument: {instruction.arg}")
+        
+        if instruction.argval:
+            tooltip_parts.append(f"Value: {instruction.argval}")
+        
+        if instruction.is_jump_target:
+            tooltip_parts.append("🎯 Jump Target")
+        
+        return " | ".join(tooltip_parts)
+    
+    def handle_bytecode_link(self, url):
+        """Handle clicking on bytecode navigation links"""
+        url_str = url.toString()
+        
+        if url_str.startswith('#offset_'):
+            # Jump to specific offset
+            self._scroll_to_anchor(url_str)
+        
+        elif url_str.startswith('#var_'):
+            # Highlight all uses of a variable
+            var_name = url_str[5:]  # Remove '#var_'
+            self._highlight_variable_uses(var_name)
+        
+        elif url_str.startswith('#call_'):
+            # Highlight all calls to a function
+            func_name = url_str[6:]  # Remove '#call_'
+            self._highlight_function_calls(func_name)
+        
+        elif url_str.startswith('#instr_'):
+            # Jump to specific instruction
+            self._scroll_to_anchor(url_str)
+    
+    def _scroll_to_anchor(self, anchor):
+        """Scroll to a specific anchor in the text"""
+        cursor = self.dis_text.textCursor()
+        cursor.movePosition(cursor.Start)
+        
+        if self.dis_text.find(anchor.replace('#', '')):
+            self.dis_text.ensureCursorVisible()
+    
+    def _highlight_variable_uses(self, var_name):
+        """Highlight all uses of a variable"""
+        if not self.bytecode_analysis:
+            return
+        
+        # Find all instructions that use this variable
+        matching_instructions = []
+        for i, instr in enumerate(self.bytecode_analysis.instructions):
+            if (instr.argval == var_name and 
+                instr.instruction_type.name in ['LOAD', 'STORE']):
+                matching_instructions.append(i)
+        
+        # Scroll to first occurrence
+        if matching_instructions:
+            self._scroll_to_anchor(f'#instr_{matching_instructions[0]}')
+    
+    def _highlight_function_calls(self, func_name):
+        """Highlight all calls to a function"""
+        if not self.bytecode_analysis:
+            return
+        
+        # Find all call instructions for this function
+        matching_instructions = []
+        for i, instr in enumerate(self.bytecode_analysis.instructions):
+            if (instr.argval == func_name and 
+                instr.instruction_type.name == 'CALL'):
+                matching_instructions.append(i)
+        
+        # Scroll to first occurrence
+        if matching_instructions:
+            self._scroll_to_anchor(f'#instr_{matching_instructions[0]}')
     
     def apply_theme(self):
         """Apply current theme to the widget"""
