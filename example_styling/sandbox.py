@@ -496,14 +496,11 @@ class SandboxWidget(QWidget):
             func_name = func.name if func.name != "<module>" else "Main Module"
             
             # Build signature using inspect.signature if function object is available
-            signature = "(module)" if func.name == "<module>" else "(signature unavailable)"
-            if hasattr(analysis, 'function_objects') and func.name in analysis.function_objects:
-                try:
-                    func_obj = analysis.function_objects[func.name]
-                    sig = inspect.signature(func_obj)
-                    signature = str(sig)
-                except Exception:
-                    signature = "(signature unavailable)"
+            if func.name == "<module>":
+                signature = "(module)"
+            else:
+                sig = inspect.signature(func.code_object)
+                signature = str(sig)
             
             overview.append(f'''
             <div style="margin: 5px 0; padding: 5px; background-color: {colors["hover"]}; border-radius: 3px;">
