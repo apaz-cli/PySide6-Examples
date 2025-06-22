@@ -29,12 +29,13 @@ class StyledMonacoWidget(QWidget):
         if hasattr(self.monaco_editor, 'monaco_interface'):
             layout.addWidget(self.monaco_editor)
             self.editor_available = True
+            # Wait for editor to be ready before applying theme
+            self.monaco_editor.editor_ready.connect(self.on_editor_ready)
         else:
             # Fallback if Monaco is not available
             self.create_fallback_ui(layout)
             self.editor_available = False
-        
-        self.apply_theme()
+            self.apply_theme()
     
     def create_fallback_ui(self, layout):
         """Create fallback UI when Monaco is not available"""
@@ -77,13 +78,26 @@ class StyledMonacoWidget(QWidget):
         """Connect to theme manager"""
         theme_manager.theme_changed.connect(self.apply_theme)
     
+    def on_editor_ready(self):
+        """Called when Monaco editor is ready"""
+        self.apply_theme()
+        
+        # Apply any pending content or language
+        if hasattr(self, '_pending_content'):
+            self.monaco_editor.set_content(self._pending_content)
+            delattr(self, '_pending_content')
+        
+        if hasattr(self, '_pending_language'):
+            self.monaco_editor.set_language(self._pending_language)
+            delattr(self, '_pending_language')
+    
     def apply_theme(self):
         """Apply current theme to the widget"""
-        if self.editor_available:
+        if self.editor_available and self.monaco_editor.is_ready():
             # Apply Monaco theme
             monaco_theme = theme_manager.get_monaco_theme()
             self.monaco_editor.set_theme(monaco_theme)
-        else:
+        elif not self.editor_available:
             # Update fallback UI styling
             colors = theme_manager.get_colors()
             fallback_style = f"""
@@ -118,8 +132,11 @@ class StyledMonacoWidget(QWidget):
     # Proxy methods to Monaco editor
     def set_content(self, content):
         """Set editor content"""
-        if self.editor_available:
+        if self.editor_available and self.monaco_editor.is_ready():
             self.monaco_editor.set_content(content)
+        elif self.editor_available:
+            # Store content to set when ready
+            self._pending_content = content
     
     def get_content(self):
         """Get editor content"""
@@ -129,8 +146,11 @@ class StyledMonacoWidget(QWidget):
     
     def set_language(self, language):
         """Set editor language"""
-        if self.editor_available:
+        if self.editor_available and self.monaco_editor.is_ready():
             self.monaco_editor.set_language(language)
+        elif self.editor_available:
+            # Store language to set when ready
+            self._pending_language = language
     
     def detect_language_from_filename(self, filename):
         """Detect and set language from filename"""
