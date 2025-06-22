@@ -116,11 +116,12 @@ class PythonAnalyzer(QObject):
 
 
 class SandboxWidget(QWidget):
-    """Sandbox panel for Python code analysis"""
+    """Sandbox panel for multi-language code analysis"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_file = None
+        self.current_language = None
         self.analyzer = PythonAnalyzer()
         self.setup_ui()
         self.connect_signals()
@@ -132,33 +133,26 @@ class SandboxWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # Status label
-        self.status_label = QLabel("No Python file selected")
+        self.status_label = QLabel("No file selected")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         
         # Tab widget for different analysis views
         self.tab_widget = QTabWidget()
         
-        # AST tab
-        self.ast_text = QTextEdit()
-        self.ast_text.setReadOnly(True)
-        self.ast_text.setPlainText("Select a Python file to see its AST representation")
-        self.tab_widget.addTab(self.ast_text, "🌳 AST")
+        # Python Analysis Tabs
+        self.setup_python_tabs()
         
-        # Disassembly tab - custom rich bytecode display
-        self.dis_text = QTextBrowser()
-        self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
-        self.dis_text.setOpenExternalLinks(False)
-        self.dis_text.anchorClicked.connect(self.handle_bytecode_link)
-        self.tab_widget.addTab(self.dis_text, "⚙️ Bytecode")
+        # C/C++ Analysis Tabs
+        self.setup_cpp_tabs()
         
-        # Analysis tab
-        self.analysis_text = QTextEdit()
-        self.analysis_text.setReadOnly(True)
-        self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
-        self.tab_widget.addTab(self.analysis_text, "📊 Analysis")
+        # Rust Analysis Tabs
+        self.setup_rust_tabs()
         
-        # Errors tab
+        # Triton Analysis Tabs
+        self.setup_triton_tabs()
+        
+        # Errors tab (shared across all languages)
         self.error_text = QTextEdit()
         self.error_text.setReadOnly(True)
         self.error_text.setPlainText("No errors")
@@ -166,26 +160,175 @@ class SandboxWidget(QWidget):
         
         layout.addWidget(self.tab_widget)
     
+    def setup_python_tabs(self):
+        """Setup Python-specific analysis tabs"""
+        # AST tab
+        self.ast_text = QTextEdit()
+        self.ast_text.setReadOnly(True)
+        self.ast_text.setPlainText("Select a Python file to see its AST representation")
+        self.tab_widget.addTab(self.ast_text, "🐍 Python AST")
+        
+        # Disassembly tab - custom rich bytecode display
+        self.dis_text = QTextBrowser()
+        self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
+        self.dis_text.setOpenExternalLinks(False)
+        self.dis_text.anchorClicked.connect(self.handle_bytecode_link)
+        self.tab_widget.addTab(self.dis_text, "⚙️ Python Bytecode")
+        
+        # Analysis tab
+        self.analysis_text = QTextEdit()
+        self.analysis_text.setReadOnly(True)
+        self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
+        self.tab_widget.addTab(self.analysis_text, "📊 Python Analysis")
+    
+    def setup_cpp_tabs(self):
+        """Setup C/C++ analysis tabs"""
+        # AST tab
+        self.cpp_ast_text = QTextEdit()
+        self.cpp_ast_text.setReadOnly(True)
+        self.cpp_ast_text.setPlainText("Select a C/C++ file to see its AST representation")
+        self.tab_widget.addTab(self.cpp_ast_text, "🔧 C/C++ AST")
+        
+        # Assembly tab
+        self.cpp_asm_text = QTextEdit()
+        self.cpp_asm_text.setReadOnly(True)
+        self.cpp_asm_text.setPlainText("Select a C/C++ file to see its assembly output")
+        self.tab_widget.addTab(self.cpp_asm_text, "⚡ C/C++ Assembly")
+        
+        # Analysis tab
+        self.cpp_analysis_text = QTextEdit()
+        self.cpp_analysis_text.setReadOnly(True)
+        self.cpp_analysis_text.setPlainText("Select a C/C++ file to see static analysis")
+        self.tab_widget.addTab(self.cpp_analysis_text, "📈 C/C++ Analysis")
+    
+    def setup_rust_tabs(self):
+        """Setup Rust analysis tabs"""
+        # HIR tab
+        self.rust_hir_text = QTextEdit()
+        self.rust_hir_text.setReadOnly(True)
+        self.rust_hir_text.setPlainText("Select a Rust file to see its HIR representation")
+        self.tab_widget.addTab(self.rust_hir_text, "🦀 Rust HIR")
+        
+        # MIR tab
+        self.rust_mir_text = QTextEdit()
+        self.rust_mir_text.setReadOnly(True)
+        self.rust_mir_text.setPlainText("Select a Rust file to see its MIR representation")
+        self.tab_widget.addTab(self.rust_mir_text, "🔩 Rust MIR")
+        
+        # LLVM IR tab
+        self.rust_llvm_text = QTextEdit()
+        self.rust_llvm_text.setReadOnly(True)
+        self.rust_llvm_text.setPlainText("Select a Rust file to see its LLVM IR")
+        self.tab_widget.addTab(self.rust_llvm_text, "⚙️ Rust LLVM")
+        
+        # Analysis tab
+        self.rust_analysis_text = QTextEdit()
+        self.rust_analysis_text.setReadOnly(True)
+        self.rust_analysis_text.setPlainText("Select a Rust file to see borrow checker analysis")
+        self.tab_widget.addTab(self.rust_analysis_text, "🔒 Rust Analysis")
+    
+    def setup_triton_tabs(self):
+        """Setup Triton analysis tabs"""
+        # Kernel AST tab
+        self.triton_ast_text = QTextEdit()
+        self.triton_ast_text.setReadOnly(True)
+        self.triton_ast_text.setPlainText("Select a Triton file to see kernel AST")
+        self.tab_widget.addTab(self.triton_ast_text, "🚀 Triton AST")
+        
+        # PTX tab
+        self.triton_ptx_text = QTextEdit()
+        self.triton_ptx_text.setReadOnly(True)
+        self.triton_ptx_text.setPlainText("Select a Triton file to see generated PTX")
+        self.tab_widget.addTab(self.triton_ptx_text, "🎯 Triton PTX")
+        
+        # Performance tab
+        self.triton_perf_text = QTextEdit()
+        self.triton_perf_text.setReadOnly(True)
+        self.triton_perf_text.setPlainText("Select a Triton file to see performance analysis")
+        self.tab_widget.addTab(self.triton_perf_text, "📊 Triton Performance")
+    
     def connect_signals(self):
         """Connect signals"""
         self.analyzer.analysis_ready.connect(self.display_analysis)
         theme_manager.theme_changed.connect(self.apply_theme)
     
     def analyze_file(self, file_path):
-        """Analyze a file if it's a Python file"""
+        """Analyze a file based on its type"""
         if not file_path:
             self.clear_analysis()
             return
         
         file_path = Path(file_path)
+        self.current_file = file_path
         
-        if file_path.suffix.lower() == '.py':
-            self.current_file = file_path
-            self.status_label.setText(f"Analyzing: {file_path.name}")
+        # Determine file type and language
+        language = self.detect_language(file_path)
+        self.current_language = language
+        
+        if language == 'python':
+            self.status_label.setText(f"Analyzing Python: {file_path.name}")
             self.analyzer.analyze_file(str(file_path))
+        elif language == 'cpp':
+            self.status_label.setText(f"Analyzing C/C++: {file_path.name}")
+            self.analyze_cpp_file(file_path)
+        elif language == 'rust':
+            self.status_label.setText(f"Analyzing Rust: {file_path.name}")
+            self.analyze_rust_file(file_path)
+        elif language == 'triton':
+            self.status_label.setText(f"Analyzing Triton: {file_path.name}")
+            self.analyze_triton_file(file_path)
         else:
             self.clear_analysis()
-            self.status_label.setText(f"Not a Python file: {file_path.name}")
+            self.status_label.setText(f"Unsupported file type: {file_path.name}")
+    
+    def detect_language(self, file_path):
+        """Detect programming language from file extension"""
+        suffix = file_path.suffix.lower()
+        
+        if suffix == '.py':
+            return 'python'
+        elif suffix in ['.c', '.cpp', '.cxx', '.cc', '.h', '.hpp', '.hxx']:
+            return 'cpp'
+        elif suffix == '.rs':
+            return 'rust'
+        elif suffix == '.py' and self.is_triton_file(file_path):
+            return 'triton'
+        else:
+            return 'unknown'
+    
+    def is_triton_file(self, file_path):
+        """Check if a Python file contains Triton code"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                return 'triton' in content.lower() and '@triton.jit' in content
+        except:
+            return False
+    
+    def analyze_cpp_file(self, file_path):
+        """Analyze C/C++ file (placeholder)"""
+        self.clear_analysis()
+        self.cpp_ast_text.setPlainText("C/C++ AST analysis not yet implemented")
+        self.cpp_asm_text.setPlainText("C/C++ assembly analysis not yet implemented")
+        self.cpp_analysis_text.setPlainText("C/C++ static analysis not yet implemented")
+        self.error_text.setPlainText("C/C++ analysis coming soon")
+    
+    def analyze_rust_file(self, file_path):
+        """Analyze Rust file (placeholder)"""
+        self.clear_analysis()
+        self.rust_hir_text.setPlainText("Rust HIR analysis not yet implemented")
+        self.rust_mir_text.setPlainText("Rust MIR analysis not yet implemented")
+        self.rust_llvm_text.setPlainText("Rust LLVM IR analysis not yet implemented")
+        self.rust_analysis_text.setPlainText("Rust borrow checker analysis not yet implemented")
+        self.error_text.setPlainText("Rust analysis coming soon")
+    
+    def analyze_triton_file(self, file_path):
+        """Analyze Triton file (placeholder)"""
+        self.clear_analysis()
+        self.triton_ast_text.setPlainText("Triton kernel AST analysis not yet implemented")
+        self.triton_ptx_text.setPlainText("Triton PTX generation not yet implemented")
+        self.triton_perf_text.setPlainText("Triton performance analysis not yet implemented")
+        self.error_text.setPlainText("Triton analysis coming soon")
     
     def display_analysis(self, ast_result, dis_result, bytecode_summary, errors):
         """Display analysis results in tabs"""
@@ -230,17 +373,38 @@ class SandboxWidget(QWidget):
         
         # Update status
         if self.current_file:
-            self.status_label.setText(f"Analysis complete: {self.current_file.name}")
+            self.status_label.setText(f"Python analysis complete: {self.current_file.name}")
     
     def clear_analysis(self):
         """Clear all analysis results"""
         self.current_file = None
+        self.current_language = None
         self.bytecode_analysis = None
+        
+        # Clear Python tabs
         self.ast_text.setPlainText("Select a Python file to see its AST representation")
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
         self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
+        
+        # Clear C/C++ tabs
+        self.cpp_ast_text.setPlainText("Select a C/C++ file to see its AST representation")
+        self.cpp_asm_text.setPlainText("Select a C/C++ file to see its assembly output")
+        self.cpp_analysis_text.setPlainText("Select a C/C++ file to see static analysis")
+        
+        # Clear Rust tabs
+        self.rust_hir_text.setPlainText("Select a Rust file to see its HIR representation")
+        self.rust_mir_text.setPlainText("Select a Rust file to see its MIR representation")
+        self.rust_llvm_text.setPlainText("Select a Rust file to see its LLVM IR")
+        self.rust_analysis_text.setPlainText("Select a Rust file to see borrow checker analysis")
+        
+        # Clear Triton tabs
+        self.triton_ast_text.setPlainText("Select a Triton file to see kernel AST")
+        self.triton_ptx_text.setPlainText("Select a Triton file to see generated PTX")
+        self.triton_perf_text.setPlainText("Select a Triton file to see performance analysis")
+        
+        # Clear shared tabs
         self.error_text.setPlainText("No errors")
-        self.status_label.setText("No Python file selected")
+        self.status_label.setText("No file selected")
     
     def create_enhanced_bytecode_display(self, bytecode_analysis):
         """Create enhanced HTML display modeled after dis.dis() with rich navigation"""
@@ -726,7 +890,21 @@ class SandboxWidget(QWidget):
             }}
         """
         
-        for text_widget in [self.ast_text, self.dis_text, self.analysis_text, self.error_text]:
+        # Apply to all text widgets
+        text_widgets = [
+            # Python tabs
+            self.ast_text, self.dis_text, self.analysis_text,
+            # C/C++ tabs
+            self.cpp_ast_text, self.cpp_asm_text, self.cpp_analysis_text,
+            # Rust tabs
+            self.rust_hir_text, self.rust_mir_text, self.rust_llvm_text, self.rust_analysis_text,
+            # Triton tabs
+            self.triton_ast_text, self.triton_ptx_text, self.triton_perf_text,
+            # Shared tabs
+            self.error_text
+        ]
+        
+        for text_widget in text_widgets:
             text_widget.setStyleSheet(text_style)
         
         # Apply tab widget style
