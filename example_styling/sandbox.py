@@ -12,15 +12,17 @@ from PySide6.QtCore import Qt, Signal, QObject
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, 
                                QLabel, QScrollArea)
 from theme_manager import theme_manager
+from bytecode_parser import BytecodeParser
 
 
 class PythonAnalyzer(QObject):
     """Analyzes Python code using AST and disassembly"""
     
-    analysis_ready = Signal(str, str, str)  # ast_dump, disassembly, errors
+    analysis_ready = Signal(str, str, str, str)  # ast_dump, disassembly, bytecode_summary, errors
     
     def __init__(self):
         super().__init__()
+        self.bytecode_parser = BytecodeParser()
     
     def analyze_file(self, file_path):
         """Analyze a Python file and emit results"""
@@ -28,17 +30,18 @@ class PythonAnalyzer(QObject):
             with open(file_path, 'r', encoding='utf-8') as f:
                 source_code = f.read()
             
-            ast_result, dis_result, errors = self.analyze_code(source_code, file_path)
-            self.analysis_ready.emit(ast_result, dis_result, errors)
+            ast_result, dis_result, bytecode_summary, errors = self.analyze_code(source_code, file_path)
+            self.analysis_ready.emit(ast_result, dis_result, bytecode_summary, errors)
             
         except Exception as e:
             error_msg = f"Error reading file: {str(e)}"
-            self.analysis_ready.emit("", "", error_msg)
+            self.analysis_ready.emit("", "", "", error_msg)
     
     def analyze_code(self, source_code, filename="<string>"):
         """Analyze Python source code"""
         ast_result = ""
         dis_result = ""
+        bytecode_summary = ""
         errors = ""
         
         try:
@@ -59,18 +62,27 @@ class PythonAnalyzer(QObject):
                 sys.stdout = old_stdout
                 dis_result = dis_output.getvalue()
                 
+                # Parse bytecode for analysis
+                try:
+                    bytecode_analysis = self.bytecode_parser.parse_disassembly(dis_result)
+                    bytecode_summary = self.bytecode_parser.format_analysis_summary(bytecode_analysis)
+                except Exception as e:
+                    bytecode_summary = f"Bytecode analysis error: {str(e)}"
+                
             except Exception as e:
                 dis_result = f"Compilation error: {str(e)}"
+                bytecode_summary = "Cannot analyze bytecode due to compilation error"
                 
         except SyntaxError as e:
             errors = f"Syntax Error: {e.msg} (line {e.lineno})"
             ast_result = "Cannot parse due to syntax error"
             dis_result = "Cannot disassemble due to syntax error"
+            bytecode_summary = "Cannot analyze bytecode due to syntax error"
             
         except Exception as e:
             errors = f"Analysis error: {str(e)}"
             
-        return ast_result, dis_result, errors
+        return ast_result, dis_result, bytecode_summary, errors
     
     def format_ast_dump(self, tree):
         """Format AST dump with better readability"""
@@ -137,6 +149,12 @@ class SandboxWidget(QWidget):
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
         self.tab_widget.addTab(self.dis_text, "⚙️ Bytecode")
         
+        # Analysis tab
+        self.analysis_text = QTextEdit()
+        self.analysis_text.setReadOnly(True)
+        self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
+        self.tab_widget.addTab(self.analysis_text, "📊 Analysis")
+        
         # Errors tab
         self.error_text = QTextEdit()
         self.error_text.setReadOnly(True)
@@ -166,7 +184,7 @@ class SandboxWidget(QWidget):
             self.clear_analysis()
             self.status_label.setText(f"Not a Python file: {file_path.name}")
     
-    def display_analysis(self, ast_result, dis_result, errors):
+    def display_analysis(self, ast_result, dis_result, bytecode_summary, errors):
         """Display analysis results in tabs"""
         # Update AST tab
         if ast_result:
@@ -180,11 +198,17 @@ class SandboxWidget(QWidget):
         else:
             self.dis_text.setPlainText("No disassembly data available")
         
+        # Update analysis tab
+        if bytecode_summary:
+            self.analysis_text.setPlainText(bytecode_summary)
+        else:
+            self.analysis_text.setPlainText("No bytecode analysis available")
+        
         # Update errors tab
         if errors:
             self.error_text.setPlainText(errors)
             # Switch to errors tab if there are errors
-            self.tab_widget.setCurrentIndex(2)
+            self.tab_widget.setCurrentIndex(3)
         else:
             self.error_text.setPlainText("No errors detected")
         
@@ -197,6 +221,7 @@ class SandboxWidget(QWidget):
         self.current_file = None
         self.ast_text.setPlainText("Select a Python file to see its AST representation")
         self.dis_text.setPlainText("Select a Python file to see its bytecode disassembly")
+        self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
         self.error_text.setPlainText("No errors")
         self.status_label.setText("No Python file selected")
     
@@ -215,7 +240,7 @@ class SandboxWidget(QWidget):
             }}
         """
         
-        for text_widget in [self.ast_text, self.dis_text, self.error_text]:
+        for text_widget in [self.ast_text, self.dis_text, self.analysis_text, self.error_text]:
             text_widget.setStyleSheet(text_style)
         
         # Apply tab widget style
