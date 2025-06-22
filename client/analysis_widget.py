@@ -36,9 +36,11 @@ class AnalysisWidget(QWidget):
         self.current_file = None
         self.current_language = None
         self.worker = None
+        self.server_available = False
         self.setup_ui()
         self.connect_signals()
         self.apply_theme()
+        self.check_server_and_load_example()
     
     def setup_ui(self):
         """Setup the analysis UI"""
@@ -46,7 +48,7 @@ class AnalysisWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # Status label
-        self.status_label = QLabel("No file selected")
+        self.status_label = QLabel("Checking analysis server...")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         
@@ -236,6 +238,10 @@ class AnalysisWidget(QWidget):
             self.clear_analysis()
             return
         
+        if not self.server_available:
+            self.show_server_unavailable_message()
+            return
+        
         file_path = Path(file_path)
         self.current_file = file_path
         
@@ -335,7 +341,14 @@ class AnalysisWidget(QWidget):
         elif result.analyzer_type == 'cpp':
             self.display_cpp_analysis(result)
         
-        self.status_label.setText(f"Analysis complete: {self.current_file.name}")
+        # Update status with appropriate file name
+        if self.current_file:
+            self.status_label.setText(f"Analysis complete: {self.current_file.name}")
+        else:
+            self.status_label.setText("Analysis complete: hello_world.py")
+        
+        # Reset status label style in case it was showing error
+        self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
     
     def display_python_analysis(self, result: AnalysisResult):
         """Display Python analysis results"""
@@ -501,6 +514,45 @@ class AnalysisWidget(QWidget):
         elif url_str.startswith('#disasm_'):
             sandbox_widget._scroll_to_anchor(url_str)
     
+    def check_server_and_load_example(self):
+        """Check server availability and load hello world example"""
+        self.server_available = self.api_client.health_check()
+        
+        if self.server_available:
+            self.status_label.setText("Analysis server connected")
+            # Load hello world example
+            self.analyze_hello_world_example()
+        else:
+            self.show_server_unavailable_message()
+    
+    def show_server_unavailable_message(self):
+        """Show server unavailable message in red"""
+        self.status_label.setText("⚠️ Analysis server cannot be reached")
+        self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+    
+    def analyze_hello_world_example(self):
+        """Analyze a hello world Python example"""
+        hello_world_code = '''def hello_world():
+    """A simple hello world function"""
+    message = "Hello, World!"
+    print(message)
+    return message
+
+if __name__ == "__main__":
+    result = hello_world()
+    print(f"Function returned: {result}")
+'''
+        
+        # Set to Python tab
+        self.main_tab_widget.setCurrentWidget(self.python_tab_widget)
+        
+        # Analyze the code directly
+        result = self.api_client.analyze_code(hello_world_code, 'python', 'hello_world.py')
+        if result:
+            self.on_analysis_complete(result)
+        else:
+            self.show_server_unavailable_message()
+    
     def apply_theme(self):
         """Apply current theme to the widget"""
         # Apply text edit styles
@@ -567,5 +619,6 @@ class AnalysisWidget(QWidget):
         self.rust_tab_widget.setStyleSheet(tab_style)
         self.triton_tab_widget.setStyleSheet(tab_style)
         
-        # Apply status label style
-        self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
+        # Apply status label style (unless it's showing server error)
+        if "cannot be reached" not in self.status_label.text():
+            self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
