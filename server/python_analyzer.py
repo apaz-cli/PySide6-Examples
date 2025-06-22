@@ -144,10 +144,23 @@ class PythonAnalyzer(AnalyzerBase):
                 return f"<code object {getattr(value, 'co_name', 'unknown')}>"
             elif callable(value):
                 return f"<function {getattr(value, '__name__', 'unknown')}>"
+            elif isinstance(value, (frozenset, set)):
+                return list(value)
+            elif isinstance(value, tuple):
+                return [serialize_value(item) for item in value]
             elif hasattr(value, '__dict__'):
                 return str(value)
             else:
                 return value
+        
+        def serialize_collection(collection):
+            """Convert collections to lists, handling nested structures"""
+            if isinstance(collection, (frozenset, set)):
+                return [serialize_value(item) for item in collection]
+            elif hasattr(collection, '__iter__') and not isinstance(collection, (str, bytes)):
+                return [serialize_value(item) for item in collection]
+            else:
+                return serialize_value(collection)
         
         return {
             'instructions': [
@@ -163,19 +176,19 @@ class PythonAnalyzer(AnalyzerBase):
                 }
                 for instr in analysis.instructions
             ],
-            'jump_targets': list(analysis.jump_targets),
-            'local_vars': list(analysis.local_vars),
-            'global_vars': list(analysis.global_vars),
-            'constants': [serialize_value(const) for const in analysis.constants],
-            'function_calls': analysis.function_calls,
+            'jump_targets': serialize_collection(analysis.jump_targets),
+            'local_vars': serialize_collection(analysis.local_vars),
+            'global_vars': serialize_collection(analysis.global_vars),
+            'constants': serialize_collection(analysis.constants),
+            'function_calls': serialize_collection(analysis.function_calls),
             'functions': [
                 {
                     'name': func.name,
                     'start_offset': func.start_offset,
-                    'varnames': list(func.varnames) if hasattr(func.varnames, '__iter__') else [],
-                    'names': list(func.names) if hasattr(func.names, '__iter__') else [],
-                    'freevars': list(func.freevars) if hasattr(func.freevars, '__iter__') else [],
-                    'cellvars': list(func.cellvars) if hasattr(func.cellvars, '__iter__') else [],
+                    'varnames': serialize_collection(func.varnames),
+                    'names': serialize_collection(func.names),
+                    'freevars': serialize_collection(func.freevars),
+                    'cellvars': serialize_collection(func.cellvars),
                     'argcount': func.argcount,
                     'kwonlyargcount': func.kwonlyargcount
                 }
