@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, QTextEdit, QTex
                                QLabel, QScrollArea)
 from theme_manager import theme_manager
 from bytecode_parser import BytecodeParser
+from sandbox import 
 
 
 class PythonAnalyzer(QObject):
