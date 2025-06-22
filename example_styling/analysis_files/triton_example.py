@@ -1,31 +1,16 @@
 import triton
 import triton.language as tl
 import torch
-import numpy as np
 
 @triton.jit
-def softmax_dropout_kernel(
+def softmax_dropout_kernel_slow(
     input_ptr, output_ptr, dropout_mask_ptr,
-    n_rows, n_cols,
-    dropout_p: tl.constexpr,
-    BLOCK_SIZE: tl.constexpr,
+    n_rows, n_cols, dropout_p: tl.constexpr, BLOCK_SIZE: tl.constexpr,
 ):
-    """
-    Fused softmax + dropout kernel with several performance issues:
-    1. Suboptimal memory access patterns
-    2. Inefficient block sizing
-    3. Redundant computations
-    4. Missing vectorization opportunities
-    5. Poor register usage
-    """
-    
-    # Get current row
     row_idx = tl.program_id(0)
-    
     if row_idx >= n_rows:
         return
     
-    # Load input row one element at a time (INEFFICIENT!)
     row_data = tl.zeros([BLOCK_SIZE], dtype=tl.float32)
     for i in range(n_cols):
         if i < BLOCK_SIZE:
@@ -36,7 +21,6 @@ def softmax_dropout_kernel(
                 row_data
             )
     
-    # Find max (inefficiently computed multiple times)
     max_val = tl.float32(-float('inf'))
     for i in range(n_cols):
         if i < BLOCK_SIZE:
@@ -45,10 +29,8 @@ def softmax_dropout_kernel(
                 row_data,
                 tl.float32(-float('inf'))
             )
-            # This is doing element-wise max incorrectly
             max_val = tl.maximum(max_val, tl.max(current_val))
     
-    # Subtract max and compute exp (redundant loads)
     exp_values = tl.zeros([BLOCK_SIZE], dtype=tl.float32)
     for i in range(n_cols):
         if i < BLOCK_SIZE:
@@ -57,14 +39,13 @@ def softmax_dropout_kernel(
                 row_data,
                 0.0
             )
-            exp_val = tl.exp(tl.max(val) - max_val)  # Inefficient: should subtract max from val
+            exp_val = tl.exp(tl.max(val) - max_val)
             exp_values = tl.where(
                 tl.arange(0, BLOCK_SIZE) == i,
                 exp_val,
                 exp_values
             )
     
-    # Compute sum (another inefficient loop)
     sum_exp = 0.0
     for i in range(n_cols):
         if i < BLOCK_SIZE:
@@ -75,14 +56,11 @@ def softmax_dropout_kernel(
             )
             sum_exp += tl.sum(val)
     
-    # Apply softmax and dropout element by element (very inefficient!)
     for i in range(n_cols):
         if i < BLOCK_SIZE:
-            # Load dropout mask
             mask_offset = row_idx * n_cols + i
             dropout_mask = tl.load(dropout_mask_ptr + mask_offset, mask=i < n_cols)
             
-            # Get softmax value
             exp_val = tl.where(
                 tl.arange(0, BLOCK_SIZE) == i,
                 exp_values,
@@ -90,123 +68,183 @@ def softmax_dropout_kernel(
             )
             softmax_val = tl.sum(exp_val) / sum_exp
             
-            # Apply dropout
             output_val = tl.where(
                 dropout_mask > dropout_p,
-                softmax_val / (1.0 - dropout_p),  # Scale by keep probability
+                softmax_val / (1.0 - dropout_p),
                 0.0
             )
             
-            # Store result
             output_offset = row_idx * n_cols + i
             tl.store(output_ptr + output_offset, output_val, mask=i < n_cols)
 
+@triton.jit
+def softmax_dropout_kernel_fast(
+    input_ptr, output_ptr, dropout_mask_ptr,
+    n_rows, n_cols, dropout_p: tl.constexpr, BLOCK_SIZE: tl.constexpr,
+):
+    row_idx = tl.program_id(0)
+    if row_idx >= n_rows:
+        return
+    
+    row_offset = row_idx * n_cols
+    col_offsets = tl.arange(0, BLOCK_SIZE)
+    mask = col_offsets < n_cols
+    
+    input_ptrs = input_ptr + row_offset + col_offsets
+    row_data = tl.load(input_ptrs, mask=mask, other=-float('inf'))
+    
+    row_max = tl.max(row_data)
+    normalized = row_data - row_max
+    exp_values = tl.exp(normalized)
+    exp_values = tl.where(mask, exp_values, 0.0)
+    
+    sum_exp = tl.sum(exp_values)
+    softmax_values = exp_values / sum_exp
+    
+    dropout_ptrs = dropout_mask_ptr + row_offset + col_offsets
+    dropout_mask = tl.load(dropout_ptrs, mask=mask, other=0.0)
+    
+    keep_mask = dropout_mask > dropout_p
+    scale = 1.0 / (1.0 - dropout_p)
+    output_values = tl.where(keep_mask, softmax_values * scale, 0.0)
+    
+    output_ptrs = output_ptr + row_offset + col_offsets
+    tl.store(output_ptrs, output_values, mask=mask)
 
-def softmax_dropout_triton(x, dropout_p=0.1, training=True):
-    """
-    Wrapper function for the inefficient softmax + dropout kernel
-    """
+@triton.autotune(
+    configs=[
+        triton.Config({'BLOCK_SIZE': 128}, num_warps=4),
+        triton.Config({'BLOCK_SIZE': 256}, num_warps=4),
+        triton.Config({'BLOCK_SIZE': 512}, num_warps=8),
+        triton.Config({'BLOCK_SIZE': 1024}, num_warps=8),
+    ],
+    key=['n_cols'],
+)
+@triton.jit
+def softmax_dropout_kernel_autotuned(
+    input_ptr, output_ptr, dropout_mask_ptr,
+    n_rows, n_cols, dropout_p: tl.constexpr, BLOCK_SIZE: tl.constexpr,
+):
+    row_idx = tl.program_id(0)
+    if row_idx >= n_rows:
+        return
+    
+    row_offset = row_idx * n_cols
+    col_offsets = tl.arange(0, BLOCK_SIZE)
+    mask = col_offsets < n_cols
+    
+    input_ptrs = input_ptr + row_offset + col_offsets
+    row_data = tl.load(input_ptrs, mask=mask, other=-float('inf'))
+    
+    row_max = tl.max(row_data)
+    normalized = row_data - row_max
+    exp_values = tl.exp(normalized)
+    exp_values = tl.where(mask, exp_values, 0.0)
+    
+    sum_exp = tl.sum(exp_values)
+    softmax_values = exp_values / sum_exp
+    
+    dropout_ptrs = dropout_mask_ptr + row_offset + col_offsets
+    dropout_mask = tl.load(dropout_ptrs, mask=mask, other=0.0)
+    
+    keep_mask = dropout_mask > dropout_p
+    scale = 1.0 / (1.0 - dropout_p)
+    output_values = tl.where(keep_mask, softmax_values * scale, 0.0)
+    
+    output_ptrs = output_ptr + row_offset + col_offsets
+    tl.store(output_ptrs, output_values, mask=mask)
+
+def softmax_dropout_slow(x, dropout_p=0.1, training=True):
     n_rows, n_cols = x.shape
-    
-    # Generate dropout mask
-    if training:
-        dropout_mask = torch.rand_like(x)
-    else:
-        dropout_mask = torch.ones_like(x)
-    
-    # Allocate output
+    dropout_mask = torch.rand_like(x) if training else torch.ones_like(x)
     output = torch.empty_like(x)
     
-    # Choose a suboptimal block size
-    BLOCK_SIZE = 128  # Often too small for modern GPUs
-    
-    # Launch kernel
+    BLOCK_SIZE = 128
     grid = (n_rows,)
-    softmax_dropout_kernel[grid](
-        x, output, dropout_mask,
-        n_rows, n_cols,
-        dropout_p,
-        BLOCK_SIZE,
+    softmax_dropout_kernel_slow[grid](
+        x, output, dropout_mask, n_rows, n_cols, dropout_p, BLOCK_SIZE,
     )
+    return output
+
+def softmax_dropout_fast(x, dropout_p=0.1, training=True):
+    n_rows, n_cols = x.shape
+    dropout_mask = torch.rand_like(x) if training else torch.ones_like(x)
+    output = torch.empty_like(x)
+    
+    if n_cols <= 1024:
+        BLOCK_SIZE = min(triton.next_power_of_2(n_cols), 1024)
+        grid = (n_rows,)
+        softmax_dropout_kernel_fast[grid](
+            x, output, dropout_mask, n_rows, n_cols, dropout_p, BLOCK_SIZE,
+        )
+    else:
+        BLOCK_SIZE = 1024
+        n_blocks = triton.cdiv(n_cols, BLOCK_SIZE)
+        grid = (n_rows, n_blocks)
+        print(f"Warning: Large sequence {n_cols}, using multi-block")
     
     return output
 
+def softmax_dropout_autotuned(x, dropout_p=0.1, training=True):
+    n_rows, n_cols = x.shape
+    dropout_mask = torch.rand_like(x) if training else torch.ones_like(x)
+    output = torch.empty_like(x)
+    
+    grid = (n_rows,)
+    softmax_dropout_kernel_autotuned[grid](
+        x, output, dropout_mask, n_rows, n_cols, dropout_p,
+    )
+    return output
 
-# Example usage and performance test
-def test_kernel():
-    # Create test data
-    batch_size, seq_len = 32, 512
-    x = torch.randn(batch_size, seq_len, device='cuda', dtype=torch.float32)
+def benchmark():
+    test_sizes = [(32, 128), (32, 512), (32, 1024), (64, 2048)]
     
-    # Test our inefficient kernel
-    print("Testing inefficient Triton kernel...")
-    torch.cuda.synchronize()
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
-    
-    start.record()
-    for _ in range(100):
-        result_triton = softmax_dropout_triton(x, dropout_p=0.1)
-    end.record()
-    torch.cuda.synchronize()
-    triton_time = start.elapsed_time(end) / 100
-    
-    # Compare with PyTorch implementation
-    print("Testing PyTorch reference...")
-    start.record()
-    for _ in range(100):
-        result_torch = torch.nn.functional.dropout(
-            torch.nn.functional.softmax(x, dim=-1), 
-            p=0.1, 
-            training=True
-        )
-    end.record()
-    torch.cuda.synchronize()
-    torch_time = start.elapsed_time(end) / 100
-    
-    print(f"Triton kernel time: {triton_time:.4f} ms")
-    print(f"PyTorch time: {torch_time:.4f} ms")
-    print(f"Speedup: {torch_time / triton_time:.2f}x")
-    
-    return result_triton, result_torch
-
+    for batch_size, seq_len in test_sizes:
+        print(f"Size: {batch_size}x{seq_len}")
+        x = torch.randn(batch_size, seq_len, device='cuda', dtype=torch.float32)
+        
+        for _ in range(10):
+            _ = softmax_dropout_fast(x)
+        torch.cuda.synchronize()
+        
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        
+        start.record()
+        for _ in range(100):
+            _ = softmax_dropout_slow(x)
+        end.record()
+        torch.cuda.synchronize()
+        slow_time = start.elapsed_time(end) / 100
+        
+        start.record()
+        for _ in range(100):
+            _ = softmax_dropout_fast(x)
+        end.record()
+        torch.cuda.synchronize()
+        fast_time = start.elapsed_time(end) / 100
+        
+        start.record()
+        for _ in range(100):
+            _ = softmax_dropout_autotuned(x)
+        end.record()
+        torch.cuda.synchronize()
+        auto_time = start.elapsed_time(end) / 100
+        
+        start.record()
+        for _ in range(100):
+            _ = torch.nn.functional.dropout(
+                torch.nn.functional.softmax(x, dim=-1), p=0.1, training=True
+            )
+        end.record()
+        torch.cuda.synchronize()
+        torch_time = start.elapsed_time(end) / 100
+        
+        print(f"  Slow: {slow_time:.4f}ms")
+        print(f"  Fast: {fast_time:.4f}ms ({slow_time/fast_time:.1f}x)")
+        print(f"  Auto: {auto_time:.4f}ms ({torch_time/auto_time:.1f}x vs PyTorch)")
+        print(f"  PyTorch: {torch_time:.4f}ms")
+        print()
 
 if __name__ == "__main__":
-    test_kernel()
-
-
-"""
-PERFORMANCE IMPROVEMENT OPPORTUNITIES:
-
-1. **Memory Access Patterns**: 
-   - Load entire rows at once using vectorized loads
-   - Eliminate redundant loads in loops
-   - Use coalesced memory access patterns
-
-2. **Algorithmic Improvements**:
-   - Compute max, exp, and sum in single passes
-   - Use online algorithms for numerical stability
-   - Fuse operations to reduce memory bandwidth
-
-3. **Block Size Optimization**:
-   - Use larger block sizes (256, 512, 1024)
-   - Make block size adaptive based on problem size
-   - Consider multiple blocks per row for large sequences
-
-4. **Vectorization**:
-   - Process multiple elements per thread
-   - Use SIMD operations where possible
-   - Optimize for GPU warp size (32 threads)
-
-5. **Register Usage**:
-   - Minimize temporary arrays
-   - Reuse registers effectively
-   - Reduce control flow divergence
-
-6. **Numerical Stability**:
-   - Use more stable softmax computation
-   - Handle edge cases better
-   - Consider mixed precision
-
-Expected improvements: 5-20x speedup with proper optimization!
-"""
+    benchmark()
