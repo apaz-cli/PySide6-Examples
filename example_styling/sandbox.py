@@ -661,7 +661,7 @@ class SandboxWidget(QWidget):
     def _scroll_to_anchor(self, anchor):
         """Scroll to a specific anchor in the text"""
         cursor = self.dis_text.textCursor()
-        cursor.movePosition(cursor.Start)
+        cursor.movePosition(cursor.MoveOperation.Start)
         
         if self.dis_text.find(anchor.replace('#', '')):
             self.dis_text.ensureCursorVisible()
