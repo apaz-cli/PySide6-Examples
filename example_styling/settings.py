@@ -47,16 +47,16 @@ class SettingsManager(QObject):
         if system == "Windows":
             # Use AppData/Roaming
             base_dir = os.environ.get("APPDATA", os.path.expanduser("~"))
-            return Path(base_dir) / "PySide6Examples" / "StylingExample"
+            return Path(base_dir) / "PerfWizard"
         
         elif system == "Darwin":  # macOS
             # Use ~/Library/Application Support
-            return Path.home() / "Library" / "Application Support" / "PySide6Examples" / "StylingExample"
+            return Path.home() / "Library" / "Application Support" / "PerfWizard"
         
         else:  # Linux and others
             # Use XDG_CONFIG_HOME or ~/.config
             config_home = os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
-            return Path(config_home) / "pyside6-examples" / "styling-example"
+            return Path(config_home) / "perfwizard"
     
     def _ensure_config_dir(self):
         """Ensure config directory exists"""

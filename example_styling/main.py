@@ -75,7 +75,7 @@ class StyledWebView(QWebEngineView):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PySide6 WebView Integration Example")
+        self.setWindowTitle("PerfWizard")
         
         # Load settings first
         self._load_settings()
