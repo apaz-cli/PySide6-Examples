@@ -138,33 +138,44 @@ class PythonAnalyzer(AnalyzerBase):
     
     def _serialize_bytecode_analysis(self, analysis):
         """Convert bytecode analysis to JSON-serializable format"""
+        def serialize_value(value):
+            """Convert non-serializable values to strings"""
+            if hasattr(value, '__code__') or str(type(value)) == "<class 'code'>":
+                return f"<code object {getattr(value, 'co_name', 'unknown')}>"
+            elif callable(value):
+                return f"<function {getattr(value, '__name__', 'unknown')}>"
+            elif hasattr(value, '__dict__'):
+                return str(value)
+            else:
+                return value
+        
         return {
             'instructions': [
                 {
                     'offset': instr.offset,
                     'opname': instr.opname,
                     'arg': instr.arg,
-                    'argval': instr.argval,
+                    'argval': serialize_value(instr.argval),
                     'argrepr': instr.argrepr,
                     'line_number': instr.line_number,
                     'is_jump_target': instr.is_jump_target,
-                    'instruction_type': instr.instruction_type.value
+                    'instruction_type': instr.instruction_type.value if hasattr(instr.instruction_type, 'value') else str(instr.instruction_type)
                 }
                 for instr in analysis.instructions
             ],
             'jump_targets': list(analysis.jump_targets),
             'local_vars': list(analysis.local_vars),
             'global_vars': list(analysis.global_vars),
-            'constants': list(analysis.constants),
+            'constants': [serialize_value(const) for const in analysis.constants],
             'function_calls': analysis.function_calls,
             'functions': [
                 {
                     'name': func.name,
                     'start_offset': func.start_offset,
-                    'varnames': func.varnames,
-                    'names': func.names,
-                    'freevars': func.freevars,
-                    'cellvars': func.cellvars,
+                    'varnames': list(func.varnames) if hasattr(func.varnames, '__iter__') else [],
+                    'names': list(func.names) if hasattr(func.names, '__iter__') else [],
+                    'freevars': list(func.freevars) if hasattr(func.freevars, '__iter__') else [],
+                    'cellvars': list(func.cellvars) if hasattr(func.cellvars, '__iter__') else [],
                     'argcount': func.argcount,
                     'kwonlyargcount': func.kwonlyargcount
                 }
