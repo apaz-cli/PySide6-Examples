@@ -100,8 +100,6 @@ class MainWindow(QMainWindow):
         self.refresh_btn = QPushButton("Refresh WebView")
         self.refresh_btn.clicked.connect(self.refresh_webview)
         
-        self.demo_btn = QPushButton("Load Demo Content")
-        self.demo_btn.clicked.connect(self.load_demo_content)
         
         self.clear_bg_btn = QPushButton("Clear Background")
         self.clear_bg_btn.clicked.connect(self.clear_background)
@@ -111,7 +109,6 @@ class MainWindow(QMainWindow):
         
         button_layout.addWidget(self.load_bg_btn)
         button_layout.addWidget(self.refresh_btn)
-        button_layout.addWidget(self.demo_btn)
         button_layout.addWidget(self.clear_bg_btn)
         button_layout.addWidget(self.dark_mode_btn)
         button_layout.addStretch()
@@ -236,7 +233,7 @@ class MainWindow(QMainWindow):
         
         # Apply button styles
         button_style = theme_manager.get_button_style()
-        for button in [self.load_bg_btn, self.refresh_btn, self.demo_btn, 
+        for button in [self.load_bg_btn, self.refresh_btn, 
                       self.clear_bg_btn, self.dark_mode_btn]:
             button.setStyleSheet(button_style)
         
@@ -326,49 +323,6 @@ class MainWindow(QMainWindow):
         self.central_widget.set_background_opacity(opacity)
     
     
-    def load_demo_content(self):
-        demo_content = '''# Monaco Editor Demo
-# This is a demonstration of the Monaco Editor integration
-
-def fibonacci(n):
-    """Calculate the nth Fibonacci number"""
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
-
-# Example usage
-for i in range(10):
-    print(f"F({i}) = {fibonacci(i)}")
-
-# Try editing this code!
-# The editor supports:
-# - Syntax highlighting
-# - Code completion
-# - Error detection
-# - Multiple languages
-
-class Calculator:
-    def __init__(self):
-        self.result = 0
-    
-    def add(self, value):
-        self.result += value
-        return self
-    
-    def multiply(self, value):
-        self.result *= value
-        return self
-    
-    def get_result(self):
-        return self.result
-
-# Method chaining example
-calc = Calculator()
-result = calc.add(5).multiply(3).add(2).get_result()
-print(f"Result: {result}")
-'''
-        self.monaco_editor.set_content(demo_content)
-        self.monaco_editor.set_language("python")
     
     def refresh_webview(self):
         # Reset Monaco editor to initial content
