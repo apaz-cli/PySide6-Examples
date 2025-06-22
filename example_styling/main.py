@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QFileSystemModel)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
-from monaco_widget import MonacoEditorWidget
+from styled_monaco_widget import StyledMonacoWidget
+from theme_manager import theme_manager
 
 
 class TransparentWidget(QWidget):
@@ -24,6 +25,10 @@ class TransparentWidget(QWidget):
     
     def set_background_opacity(self, opacity):
         self.background_opacity = opacity
+        self.update()
+    
+    def set_dark_mode(self, dark_mode):
+        self.dark_mode = dark_mode
         self.update()
     
     def paintEvent(self, event):
@@ -48,12 +53,10 @@ class TransparentWidget(QWidget):
             painter.drawPixmap(x, y, scaled_pixmap)
         
         # Apply opacity overlay
+        colors = theme_manager.get_colors()
+        overlay_color = QColor(30, 30, 30) if self.dark_mode else Qt.white
         painter.setOpacity(1.0 - self.background_opacity)
-        if self.dark_mode:
-            # In dark mode, use a dark overlay instead of white
-            painter.fillRect(self.rect(), QBrush(QColor(30, 30, 30)))
-        else:
-            painter.fillRect(self.rect(), QBrush(Qt.white))
+        painter.fillRect(self.rect(), QBrush(overlay_color))
         
         painter.end()
 
@@ -73,12 +76,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PySide6 WebView Integration Example")
         self.setGeometry(100, 100, 1000, 700)
         
-        # Track dark mode state
-        self.dark_mode = False
-        
         # Create custom central widget with background support
         self.central_widget = TransparentWidget()
         self.setCentralWidget(self.central_widget)
+        
+        # Connect to theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
         main_layout = QVBoxLayout(self.central_widget)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -86,21 +89,6 @@ class MainWindow(QMainWindow):
         # Top controls section
         self.controls_group = QGroupBox("Native Qt Controls")
         self.controls_group.setObjectName("controls_group")
-        self.controls_group.setStyleSheet("""
-            QGroupBox {
-                background-color: rgba(255, 255, 255, 150);
-                border: 2px solid #4a90e2;
-                border-radius: 10px;
-                padding-top: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                padding: 0 10px;
-                color: #2c3e50;
-            }
-        """)
         controls_layout = QVBoxLayout()
         
         # Button row
@@ -123,8 +111,7 @@ class MainWindow(QMainWindow):
         self.style_button(self.clear_bg_btn)
         
         self.dark_mode_btn = QPushButton("🌙 Dark Mode")
-        self.dark_mode_btn.clicked.connect(self.toggle_dark_mode)
-        self.style_button(self.dark_mode_btn)
+        self.dark_mode_btn.clicked.connect(theme_manager.toggle_dark_mode)
         
         button_layout.addWidget(self.load_bg_btn)
         button_layout.addWidget(self.refresh_btn)
@@ -136,27 +123,12 @@ class MainWindow(QMainWindow):
         # Opacity slider
         slider_layout = QHBoxLayout()
         self.slider_label = QLabel("Background Opacity:")
-        self.slider_label.setStyleSheet("color: #2c3e50; font-weight: bold;")
         self.opacity_slider = QSlider(Qt.Horizontal)
         self.opacity_slider.setMinimum(0)
         self.opacity_slider.setMaximum(100)
         self.opacity_slider.setValue(70)
         self.opacity_slider.valueChanged.connect(self.update_background_opacity)
-        self.opacity_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 8px;
-                background: #ddd;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #4a90e2;
-                width: 20px;
-                margin: -6px 0;
-                border-radius: 10px;
-            }
-        """)
         self.opacity_label = QLabel("70%")
-        self.opacity_label.setStyleSheet("color: #2c3e50; font-weight: bold;")
         
         slider_layout.addWidget(self.slider_label)
         slider_layout.addWidget(self.opacity_slider)
@@ -173,21 +145,6 @@ class MainWindow(QMainWindow):
         # File Explorer section
         self.explorer_group = QGroupBox("File Explorer")
         self.explorer_group.setObjectName("explorer_group")
-        self.explorer_group.setStyleSheet("""
-            QGroupBox {
-                background-color: rgba(255, 255, 255, 120);
-                border: 2px solid #9b59b6;
-                border-radius: 10px;
-                padding-top: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                padding: 0 10px;
-                color: #2c3e50;
-            }
-        """)
         explorer_layout = QVBoxLayout()
         
         # Directory dropdown
@@ -196,23 +153,6 @@ class MainWindow(QMainWindow):
         self.dir_combo.addItem("Home Directory", os.path.expanduser("~"))
         self.dir_combo.addItem("Root Directory", "/")
         self.dir_combo.currentTextChanged.connect(self.change_directory)
-        self.dir_combo.setStyleSheet("""
-            QComboBox {
-                background-color: rgba(255, 255, 255, 100);
-                border: 1px solid #bdc3c7;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 12px;
-                color: #2c3e50;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-            }
-        """)
         
         # File tree view
         self.file_model = QFileSystemModel()
@@ -226,37 +166,10 @@ class MainWindow(QMainWindow):
         self.file_tree.hideColumn(3)  # Hide date column
         self.file_tree.setHeaderHidden(True)  # Hide the header with "Name"
         self.file_tree.clicked.connect(self.file_selected)
-        self.file_tree.setStyleSheet("""
-            QTreeView {
-                background-color: rgba(255, 255, 255, 80);
-                border: 1px solid #bdc3c7;
-                border-radius: 5px;
-                font-size: 12px;
-                color: #2c3e50;
-            }
-            QTreeView::item {
-                padding: 2px;
-            }
-            QTreeView::item:selected {
-                background-color: rgba(74, 144, 226, 0.3);
-            }
-            QTreeView::item:hover {
-                background-color: rgba(74, 144, 226, 0.1);
-            }
-        """)
         
         # Selected file label
         self.selected_file_label = QLabel("No file selected")
         self.selected_file_label.setWordWrap(True)
-        self.selected_file_label.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                font-size: 11px;
-                padding: 5px;
-                background-color: rgba(255, 255, 255, 60);
-                border-radius: 3px;
-            }
-        """)
         
         explorer_layout.addWidget(QLabel("Directory:"))
         explorer_layout.addWidget(self.dir_combo)
@@ -267,24 +180,9 @@ class MainWindow(QMainWindow):
         # Monaco Editor section
         self.editor_group = QGroupBox("Monaco Editor")
         self.editor_group.setObjectName("editor_group")
-        self.editor_group.setStyleSheet("""
-            QGroupBox {
-                background-color: rgba(255, 255, 255, 120);
-                border: 2px solid #27ae60;
-                border-radius: 10px;
-                padding-top: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                padding: 0 10px;
-                color: #2c3e50;
-            }
-        """)
         editor_layout = QVBoxLayout()
         
-        self.monaco_editor = MonacoEditorWidget()
+        self.monaco_editor = StyledMonacoWidget()
         self.monaco_editor.content_changed.connect(self.on_editor_content_changed)
         self.monaco_editor.set_language("python")
         self.monaco_editor.set_content("# Welcome to Monaco Editor\nprint('Hello World!')")
@@ -295,52 +193,16 @@ class MainWindow(QMainWindow):
         # Placeholder section
         self.placeholder_group = QGroupBox("Placeholder Panel")
         self.placeholder_group.setObjectName("placeholder_group")
-        self.placeholder_group.setStyleSheet("""
-            QGroupBox {
-                background-color: rgba(255, 255, 255, 120);
-                border: 2px solid #e74c3c;
-                border-radius: 10px;
-                padding-top: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                padding: 0 10px;
-                color: #2c3e50;
-            }
-        """)
         placeholder_layout = QVBoxLayout()
         
-        info_label = QLabel("This is a placeholder panel.\nFuture functionality will be added here.")
-        info_label.setWordWrap(True)
-        self.info_label = info_label  # Store reference
-        info_label.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                font-size: 13px;
-                padding: 10px;
-                background-color: rgba(255, 255, 255, 80);
-                border-radius: 5px;
-            }
-        """)
+        self.info_label = QLabel("This is a placeholder panel.\nFuture functionality will be added here.")
+        self.info_label.setWordWrap(True)
         
-        placeholder_content = QLabel("Reserved for future features...")
-        placeholder_content.setAlignment(Qt.AlignCenter)
-        placeholder_content.setStyleSheet("""
-            QLabel {
-                color: #7f8c8d;
-                font-size: 12px;
-                font-style: italic;
-                padding: 20px;
-                background-color: rgba(255, 255, 255, 50);
-                border: 2px dashed #bdc3c7;
-                border-radius: 5px;
-            }
-        """)
+        self.placeholder_content = QLabel("Reserved for future features...")
+        self.placeholder_content.setAlignment(Qt.AlignCenter)
         
-        placeholder_layout.addWidget(info_label)
-        placeholder_layout.addWidget(placeholder_content)
+        placeholder_layout.addWidget(self.info_label)
+        placeholder_layout.addWidget(self.placeholder_content)
         placeholder_layout.addStretch()
         self.placeholder_group.setLayout(placeholder_layout)
         
@@ -352,350 +214,50 @@ class MainWindow(QMainWindow):
         # Add all to main layout
         main_layout.addWidget(self.controls_group)
         main_layout.addLayout(content_layout)
-    
-    def style_button(self, button):
-        if self.dark_mode:
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: #34495e;
-                    color: #ecf0f1;
-                    border: 1px solid #7f8c8d;
-                    padding: 8px 16px;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background-color: #2c3e50;
-                    border-color: #95a5a6;
-                }
-                QPushButton:pressed {
-                    background-color: #1a252f;
-                }
-            """)
-        else:
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4a90e2;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background-color: #357abd;
-                }
-                QPushButton:pressed {
-                    background-color: #2968a3;
-                }
-            """)
-    
-    def toggle_dark_mode(self):
-        self.dark_mode = not self.dark_mode
-        self.central_widget.dark_mode = self.dark_mode
-        self.central_widget.update()  # Trigger repaint
         
-        # Update button text and icon
-        if self.dark_mode:
+        # Apply initial theme
+        self.apply_theme()
+    
+    def on_theme_changed(self, dark_mode):
+        """Handle theme changes"""
+        self.central_widget.set_dark_mode(dark_mode)
+        
+        # Update button text
+        if dark_mode:
             self.dark_mode_btn.setText("☀️ Light Mode")
         else:
             self.dark_mode_btn.setText("🌙 Dark Mode")
         
-        # Update all button styles
+        self.apply_theme()
+    
+    def apply_theme(self):
+        """Apply current theme to all widgets"""
+        # Apply group box styles
+        self.controls_group.setStyleSheet(theme_manager.get_group_box_style('primary'))
+        self.explorer_group.setStyleSheet(theme_manager.get_group_box_style('purple'))
+        self.editor_group.setStyleSheet(theme_manager.get_group_box_style('secondary'))
+        self.placeholder_group.setStyleSheet(theme_manager.get_group_box_style('accent'))
+        
+        # Apply button styles
+        button_style = theme_manager.get_button_style()
         for button in [self.load_bg_btn, self.refresh_btn, self.demo_btn, 
                       self.clear_bg_btn, self.dark_mode_btn]:
-            self.style_button(button)
+            button.setStyleSheet(button_style)
         
-        # Update group box styles
-        if self.dark_mode:
-            group_style_controls = """
-                QGroupBox {
-                    background-color: rgba(44, 62, 80, 150);
-                    border: 2px solid #3498db;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #ecf0f1;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #ecf0f1;
-                }
-            """
-            group_style_explorer = """
-                QGroupBox {
-                    background-color: rgba(44, 62, 80, 120);
-                    border: 2px solid #9b59b6;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #ecf0f1;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #ecf0f1;
-                }
-            """
-            group_style_editor = """
-                QGroupBox {
-                    background-color: rgba(44, 62, 80, 120);
-                    border: 2px solid #2ecc71;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #ecf0f1;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #ecf0f1;
-                }
-            """
-            group_style_placeholder = """
-                QGroupBox {
-                    background-color: rgba(44, 62, 80, 120);
-                    border: 2px solid #e74c3c;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #ecf0f1;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #ecf0f1;
-                }
-            """
-            label_style = """
-                QLabel {
-                    color: #ecf0f1;
-                    font-size: 13px;
-                    padding: 10px;
-                    background-color: rgba(52, 73, 94, 80);
-                    border-radius: 5px;
-                }
-            """
-            slider_style = """
-                QSlider::groove:horizontal {
-                    height: 8px;
-                    background: #34495e;
-                    border-radius: 4px;
-                }
-                QSlider::handle:horizontal {
-                    background: #3498db;
-                    width: 20px;
-                    margin: -6px 0;
-                    border-radius: 10px;
-                }
-            """
-            slider_label_style = "color: #ecf0f1; font-weight: bold;"
-            
-            combo_style = """
-                QComboBox {
-                    background-color: rgba(52, 73, 94, 100);
-                    border: 1px solid #7f8c8d;
-                    border-radius: 5px;
-                    padding: 5px;
-                    font-size: 12px;
-                    color: #ecf0f1;
-                }
-                QComboBox::drop-down {
-                    border: none;
-                }
-                QComboBox::down-arrow {
-                    width: 12px;
-                    height: 12px;
-                }
-            """
-            
-            tree_style = """
-                QTreeView {
-                    background-color: rgba(52, 73, 94, 80);
-                    border: 1px solid #7f8c8d;
-                    border-radius: 5px;
-                    font-size: 12px;
-                    color: #ecf0f1;
-                }
-                QTreeView::item {
-                    padding: 2px;
-                }
-                QTreeView::item:selected {
-                    background-color: rgba(52, 152, 219, 0.3);
-                }
-                QTreeView::item:hover {
-                    background-color: rgba(52, 152, 219, 0.1);
-                }
-            """
-            
-            file_label_style = """
-                QLabel {
-                    color: #ecf0f1;
-                    font-size: 11px;
-                    padding: 5px;
-                    background-color: rgba(44, 62, 80, 60);
-                    border-radius: 3px;
-                }
-            """
-        else:
-            group_style_controls = """
-                QGroupBox {
-                    background-color: rgba(255, 255, 255, 150);
-                    border: 2px solid #4a90e2;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #2c3e50;
-                }
-            """
-            group_style_explorer = """
-                QGroupBox {
-                    background-color: rgba(255, 255, 255, 120);
-                    border: 2px solid #9b59b6;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #2c3e50;
-                }
-            """
-            group_style_editor = """
-                QGroupBox {
-                    background-color: rgba(255, 255, 255, 120);
-                    border: 2px solid #27ae60;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #2c3e50;
-                }
-            """
-            group_style_placeholder = """
-                QGroupBox {
-                    background-color: rgba(255, 255, 255, 120);
-                    border: 2px solid #e74c3c;
-                    border-radius: 10px;
-                    padding-top: 20px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    padding: 0 10px;
-                    color: #2c3e50;
-                }
-            """
-            label_style = """
-                QLabel {
-                    color: #2c3e50;
-                    font-size: 13px;
-                    padding: 10px;
-                    background-color: rgba(255, 255, 255, 80);
-                    border-radius: 5px;
-                }
-            """
-            slider_style = """
-                QSlider::groove:horizontal {
-                    height: 8px;
-                    background: #ddd;
-                    border-radius: 4px;
-                }
-                QSlider::handle:horizontal {
-                    background: #4a90e2;
-                    width: 20px;
-                    margin: -6px 0;
-                    border-radius: 10px;
-                }
-            """
-            slider_label_style = "color: #2c3e50; font-weight: bold;"
-            
-            combo_style = """
-                QComboBox {
-                    background-color: rgba(255, 255, 255, 100);
-                    border: 1px solid #bdc3c7;
-                    border-radius: 5px;
-                    padding: 5px;
-                    font-size: 12px;
-                    color: #2c3e50;
-                }
-                QComboBox::drop-down {
-                    border: none;
-                }
-                QComboBox::down-arrow {
-                    width: 12px;
-                    height: 12px;
-                }
-            """
-            
-            tree_style = """
-                QTreeView {
-                    background-color: rgba(255, 255, 255, 80);
-                    border: 1px solid #bdc3c7;
-                    border-radius: 5px;
-                    font-size: 12px;
-                    color: #2c3e50;
-                }
-                QTreeView::item {
-                    padding: 2px;
-                }
-                QTreeView::item:selected {
-                    background-color: rgba(74, 144, 226, 0.3);
-                }
-                QTreeView::item:hover {
-                    background-color: rgba(74, 144, 226, 0.1);
-                }
-            """
-            
-            file_label_style = """
-                QLabel {
-                    color: #2c3e50;
-                    font-size: 11px;
-                    padding: 5px;
-                    background-color: rgba(255, 255, 255, 60);
-                    border-radius: 3px;
-                }
-            """
+        # Apply other widget styles
+        self.slider_label.setStyleSheet(theme_manager.get_text_label_style())
+        self.opacity_label.setStyleSheet(theme_manager.get_text_label_style())
+        self.opacity_slider.setStyleSheet(theme_manager.get_slider_style())
         
-        # Find and update all widgets
-        self.controls_group.setStyleSheet(group_style_controls)
-        self.explorer_group.setStyleSheet(group_style_explorer)
-        self.editor_group.setStyleSheet(group_style_editor)
-        self.placeholder_group.setStyleSheet(group_style_placeholder)
+        # Apply explorer widget styles
+        self.dir_combo.setStyleSheet(theme_manager.get_combo_box_style())
+        self.file_tree.setStyleSheet(theme_manager.get_tree_view_style())
+        self.selected_file_label.setStyleSheet(theme_manager.get_small_label_style())
         
-        # Update other widgets
-        self.slider_label.setStyleSheet(slider_label_style)
-        self.opacity_label.setStyleSheet(slider_label_style)
-        self.info_label.setStyleSheet(label_style)
-        
-        self.opacity_slider.setStyleSheet(slider_style)
-        
-        # Update explorer widgets
-        self.dir_combo.setStyleSheet(combo_style)
-        self.file_tree.setStyleSheet(tree_style)
-        self.selected_file_label.setStyleSheet(file_label_style)
-        
-        # Update Monaco editor theme
-        self.apply_dark_mode_to_editor()
+        # Apply placeholder styles
+        self.info_label.setStyleSheet(theme_manager.get_label_style())
+        self.placeholder_content.setStyleSheet(theme_manager.get_placeholder_content_style())
+    
     
     def change_directory(self, text):
         """Change the file explorer directory"""
@@ -742,11 +304,6 @@ class MainWindow(QMainWindow):
         else:
             self.selected_file_label.setText(f"Directory: {file_info.fileName()}")
 
-    def apply_dark_mode_to_editor(self):
-        if self.dark_mode:
-            self.monaco_editor.set_theme('vs-dark')
-        else:
-            self.monaco_editor.set_theme('vs')
     
     def on_editor_content_changed(self, content):
         """Handle Monaco editor content changes"""
