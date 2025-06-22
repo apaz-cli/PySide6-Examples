@@ -99,51 +99,44 @@ class BytecodeAnalysis:
 class BytecodeParser:
     """Parses dis.dis() output into structured data"""
     
-    # Core instruction patterns (stable across Python versions)
-    LOAD_INSTRUCTIONS = {
-        'LOAD_CONST', 'LOAD_NAME', 'LOAD_GLOBAL', 'LOAD_FAST', 
-        'LOAD_DEREF', 'LOAD_CLOSURE'
-    }
-    
-    STORE_INSTRUCTIONS = {
-        'STORE_NAME', 'STORE_GLOBAL', 'STORE_FAST', 'STORE_DEREF',
-        'STORE_SUBSCR', 'STORE_ATTR'
-    }
-    
-    CALL_INSTRUCTIONS = {
-        'CALL_FUNCTION', 'CALL_FUNCTION_KW', 'CALL_FUNCTION_EX',
-        'CALL_METHOD', 'CALL'  # CALL is newer Python versions
-    }
-    
-    JUMP_INSTRUCTIONS = {
-        'JUMP_FORWARD', 'JUMP_BACKWARD', 'JUMP_ABSOLUTE', 'JUMP_BACKWARD_NO_INTERRUPT',
-        'POP_JUMP_IF_TRUE', 'POP_JUMP_IF_FALSE', 'POP_JUMP_FORWARD_IF_TRUE', 
-        'POP_JUMP_FORWARD_IF_FALSE', 'POP_JUMP_BACKWARD_IF_TRUE', 'POP_JUMP_BACKWARD_IF_FALSE',
-        'JUMP_IF_TRUE_OR_POP', 'JUMP_IF_FALSE_OR_POP', 'FOR_ITER', 'SETUP_LOOP',
-        'BREAK_LOOP', 'CONTINUE_LOOP', 'SETUP_EXCEPT', 'SETUP_FINALLY', 'SETUP_WITH',
-        'SETUP_ASYNC_WITH', 'BEFORE_ASYNC_WITH', 'END_ASYNC_FOR'
-    }
-    
-    COMPARE_INSTRUCTIONS = {
-        'COMPARE_OP', 'IS_OP', 'CONTAINS_OP'
-    }
-    
-    BINARY_INSTRUCTIONS = {
-        'BINARY_ADD', 'BINARY_SUBTRACT', 'BINARY_MULTIPLY', 'BINARY_DIVIDE',
-        'BINARY_MODULO', 'BINARY_POWER', 'BINARY_AND', 'BINARY_OR', 'BINARY_XOR'
-    }
-    
-    BUILD_INSTRUCTIONS = {
-        'BUILD_TUPLE', 'BUILD_LIST', 'BUILD_SET', 'BUILD_MAP',
-        'BUILD_SLICE', 'UNPACK_SEQUENCE'
-    }
-    
-    RETURN_INSTRUCTIONS = {
-        'RETURN_VALUE', 'YIELD_VALUE'
-    }
-    
-    LOOP_INSTRUCTIONS = {
-        'GET_ITER', 'FOR_ITER'
+    INSTRUCTION_TYPES = {
+        InstructionType.LOAD: {
+            'LOAD_CONST', 'LOAD_NAME', 'LOAD_GLOBAL', 'LOAD_FAST', 
+            'LOAD_DEREF', 'LOAD_CLOSURE'
+        },
+        InstructionType.STORE: {
+            'STORE_NAME', 'STORE_GLOBAL', 'STORE_FAST', 'STORE_DEREF',
+            'STORE_SUBSCR', 'STORE_ATTR'
+        },
+        InstructionType.CALL: {
+            'CALL_FUNCTION', 'CALL_FUNCTION_KW', 'CALL_FUNCTION_EX',
+            'CALL_METHOD', 'CALL'
+        },
+        InstructionType.JUMP: {
+            'JUMP_FORWARD', 'JUMP_BACKWARD', 'JUMP_ABSOLUTE', 'JUMP_BACKWARD_NO_INTERRUPT',
+            'POP_JUMP_IF_TRUE', 'POP_JUMP_IF_FALSE', 'POP_JUMP_FORWARD_IF_TRUE', 
+            'POP_JUMP_FORWARD_IF_FALSE', 'POP_JUMP_BACKWARD_IF_TRUE', 'POP_JUMP_BACKWARD_IF_FALSE',
+            'JUMP_IF_TRUE_OR_POP', 'JUMP_IF_FALSE_OR_POP', 'FOR_ITER', 'SETUP_LOOP',
+            'BREAK_LOOP', 'CONTINUE_LOOP', 'SETUP_EXCEPT', 'SETUP_FINALLY', 'SETUP_WITH',
+            'SETUP_ASYNC_WITH', 'BEFORE_ASYNC_WITH', 'END_ASYNC_FOR'
+        },
+        InstructionType.COMPARE: {
+            'COMPARE_OP', 'IS_OP', 'CONTAINS_OP'
+        },
+        InstructionType.BINARY_OP: {
+            'BINARY_ADD', 'BINARY_SUBTRACT', 'BINARY_MULTIPLY', 'BINARY_DIVIDE',
+            'BINARY_MODULO', 'BINARY_POWER', 'BINARY_AND', 'BINARY_OR', 'BINARY_XOR'
+        },
+        InstructionType.BUILD: {
+            'BUILD_TUPLE', 'BUILD_LIST', 'BUILD_SET', 'BUILD_MAP',
+            'BUILD_SLICE', 'UNPACK_SEQUENCE'
+        },
+        InstructionType.RETURN: {
+            'RETURN_VALUE', 'YIELD_VALUE'
+        },
+        InstructionType.LOOP: {
+            'GET_ITER', 'FOR_ITER'
+        }
     }
     
     def __init__(self):
@@ -152,52 +145,26 @@ class BytecodeParser:
     def _build_instruction_map(self) -> Dict[str, InstructionType]:
         """Build mapping from instruction name to type"""
         mapping = {}
-        
-        for instr in self.LOAD_INSTRUCTIONS:
-            mapping[instr] = InstructionType.LOAD
-        for instr in self.STORE_INSTRUCTIONS:
-            mapping[instr] = InstructionType.STORE
-        for instr in self.CALL_INSTRUCTIONS:
-            mapping[instr] = InstructionType.CALL
-        for instr in self.JUMP_INSTRUCTIONS:
-            mapping[instr] = InstructionType.JUMP
-        for instr in self.COMPARE_INSTRUCTIONS:
-            mapping[instr] = InstructionType.COMPARE
-        for instr in self.BINARY_INSTRUCTIONS:
-            mapping[instr] = InstructionType.BINARY_OP
-        for instr in self.BUILD_INSTRUCTIONS:
-            mapping[instr] = InstructionType.BUILD
-        for instr in self.RETURN_INSTRUCTIONS:
-            mapping[instr] = InstructionType.RETURN
-        for instr in self.LOOP_INSTRUCTIONS:
-            mapping[instr] = InstructionType.LOOP
-            
+        for instr_type, instructions in self.INSTRUCTION_TYPES.items():
+            for instr in instructions:
+                mapping[instr] = instr_type
         return mapping
     
     def parse_disassembly(self, dis_output: str) -> BytecodeAnalysis:
         """Parse dis.dis() output into structured bytecode representation"""
         lines = dis_output.strip().split('\n')
+        jump_targets = self._extract_jump_targets(lines)
+        
         instructions = []
-        jump_targets = set()
         local_vars = set()
         global_vars = set()
         constants = set()
         function_calls = []
         
-        # First pass: identify jump targets
-        for line in lines:
-            if '>>' in line:
-                match = re.search(r'>>\s*(\d+)', line)
-                if match:
-                    jump_targets.add(int(match.group(1)))
-        
-        # Second pass: parse instructions
         for line in lines:
             instruction = self._parse_instruction_line(line, jump_targets)
             if instruction:
                 instructions.append(instruction)
-                
-                # Extract variable and constant information
                 self._extract_metadata(instruction, local_vars, global_vars, constants, function_calls)
         
         return BytecodeAnalysis(
@@ -207,57 +174,22 @@ class BytecodeParser:
             global_vars=global_vars,
             constants=constants,
             function_calls=function_calls,
-            functions=[],  # Will be populated by analyze_code_object
+            functions=[],
             main_function=None
         )
     
     def analyze_code_object(self, code_obj, source_code: str = "", function_objects: Dict[str, Any] = None) -> BytecodeAnalysis:
         """Analyze a code object directly to get detailed function information"""
-        functions = []
-        all_instructions = []
-        jump_targets = set()
-        local_vars = set()
-        global_vars = set()
-        constants = set()
-        function_calls = []
-        
         if function_objects is None:
             function_objects = {}
         
-        # Analyze main code object
+        functions = []
         main_function = self._analyze_single_function(code_obj, "<module>", 0, function_objects.get("<module>"))
         functions.append(main_function)
         
-        # Find nested functions by looking for LOAD_CONST instructions with code objects
         self._find_nested_functions(code_obj, functions, len(main_function.instructions), function_objects)
         
-        # Collect all instructions and metadata
-        for func in functions:
-            all_instructions.extend(func.instructions)
-            local_vars.update(func.varnames)
-            global_vars.update(func.names)
-            constants.update(str(c) for c in func.constants if c is not None)
-            
-            # Extract function calls from instructions
-            for instr in func.instructions:
-                if instr.instruction_type == InstructionType.CALL and instr.argval:
-                    function_calls.append(instr.argval)
-        
-        # Collect jump targets
-        for instr in all_instructions:
-            if instr.is_jump_target:
-                jump_targets.add(instr.offset)
-        
-        return BytecodeAnalysis(
-            instructions=all_instructions,
-            jump_targets=jump_targets,
-            local_vars=local_vars,
-            global_vars=global_vars,
-            constants=constants,
-            function_calls=function_calls,
-            functions=functions,
-            main_function=main_function
-        )
+        return self._build_analysis_from_functions(functions, main_function)
     
     def _analyze_single_function(self, code_obj, name: str, offset_base: int, function_object: Any) -> FunctionInfo:
         """Analyze a single function's code object"""
@@ -301,13 +233,12 @@ class BytecodeParser:
     def _find_nested_functions(self, code_obj, functions: List[FunctionInfo], offset_base: int, function_objects: Dict[str, Any]):
         """Recursively find nested functions in constants"""
         for const in code_obj.co_consts:
-            if hasattr(const, 'co_code'):  # It's a code object
+            if hasattr(const, 'co_code'):
                 func_name = const.co_name
                 func_obj = function_objects.get(func_name)
                 nested_func = self._analyze_single_function(const, func_name, offset_base, func_obj)
                 functions.append(nested_func)
                 
-                # Recursively find functions within this function
                 self._find_nested_functions(const, functions, offset_base + len(nested_func.instructions) * 2, function_objects)
                 offset_base += len(nested_func.instructions) * 2
     
@@ -317,13 +248,10 @@ class BytecodeParser:
         if not line or line.startswith('Disassembly'):
             return None
         
-        # Handle jump target marker
         is_jump_target = line.startswith('>>')
         if is_jump_target:
             line = line[2:].strip()
         
-        # Parse instruction components
-        # Format: offset opname [arg] [argval] [(argrepr)]
         parts = line.split()
         if len(parts) < 2:
             return None
@@ -334,34 +262,10 @@ class BytecodeParser:
         except (ValueError, IndexError):
             return None
         
-        # Extract line number if present (in parentheses at start)
-        line_number = None
-        line_match = re.search(r'\((\d+)\)', line)
-        if line_match:
-            line_number = int(line_match.group(1))
-        
-        # Extract argument and argument representation
-        arg = None
-        argval = None
-        argrepr = ""
-        
-        if len(parts) > 2:
-            try:
-                arg = int(parts[2])
-            except ValueError:
-                pass
-        
-        # Extract argument representation (everything after the opname and arg)
-        if len(parts) > 3:
-            argrepr = ' '.join(parts[3:])
-            # Clean up parentheses and extract argval
-            if '(' in argrepr and ')' in argrepr:
-                argval_match = re.search(r'\(([^)]+)\)', argrepr)
-                if argval_match:
-                    argval = argval_match.group(1)
-        
-        # Determine instruction type
-        instruction_type = self.instruction_map.get(opname, InstructionType.OTHER)
+        line_number = self._extract_line_number(line)
+        arg = self._extract_arg(parts)
+        argrepr = ' '.join(parts[3:]) if len(parts) > 3 else ""
+        argval = self._extract_argval(argrepr)
         
         return BytecodeInstruction(
             offset=offset,
@@ -371,24 +275,23 @@ class BytecodeParser:
             argrepr=argrepr,
             line_number=line_number,
             is_jump_target=is_jump_target,
-            instruction_type=instruction_type
+            instruction_type=self.instruction_map.get(opname, InstructionType.OTHER)
         )
     
     def _extract_metadata(self, instruction: BytecodeInstruction, 
                          local_vars: Set[str], global_vars: Set[str], 
                          constants: Set[str], function_calls: List[str]):
         """Extract variable names, constants, and function calls from instruction"""
-        
-        if instruction.opname in ['LOAD_FAST', 'STORE_FAST'] and instruction.argval:
+        if not instruction.argval:
+            return
+            
+        if instruction.opname in ['LOAD_FAST', 'STORE_FAST']:
             local_vars.add(instruction.argval)
-        
-        elif instruction.opname in ['LOAD_GLOBAL', 'STORE_GLOBAL'] and instruction.argval:
+        elif instruction.opname in ['LOAD_GLOBAL', 'STORE_GLOBAL']:
             global_vars.add(instruction.argval)
-        
-        elif instruction.opname == 'LOAD_CONST' and instruction.argval:
+        elif instruction.opname == 'LOAD_CONST':
             constants.add(instruction.argval)
-        
-        elif instruction.instruction_type == InstructionType.CALL and instruction.argval:
+        elif instruction.instruction_type == InstructionType.CALL:
             function_calls.append(instruction.argval)
     
     def format_analysis_summary(self, analysis: BytecodeAnalysis) -> str:
@@ -451,6 +354,70 @@ class BytecodeParser:
                              if instr.opname in ['POP_JUMP_IF_TRUE', 'POP_JUMP_IF_FALSE', 
                                                'JUMP_IF_TRUE_OR_POP', 'JUMP_IF_FALSE_OR_POP']])
         return decision_points + 1
+    
+    def _extract_jump_targets(self, lines: List[str]) -> Set[int]:
+        """Extract jump targets from disassembly lines"""
+        jump_targets = set()
+        for line in lines:
+            if '>>' in line:
+                match = re.search(r'>>\s*(\d+)', line)
+                if match:
+                    jump_targets.add(int(match.group(1)))
+        return jump_targets
+    
+    def _extract_line_number(self, line: str) -> Optional[int]:
+        """Extract line number from instruction line"""
+        line_match = re.search(r'\((\d+)\)', line)
+        return int(line_match.group(1)) if line_match else None
+    
+    def _extract_arg(self, parts: List[str]) -> Optional[int]:
+        """Extract argument from instruction parts"""
+        if len(parts) > 2:
+            try:
+                return int(parts[2])
+            except ValueError:
+                pass
+        return None
+    
+    def _extract_argval(self, argrepr: str) -> Optional[str]:
+        """Extract argument value from argument representation"""
+        if '(' in argrepr and ')' in argrepr:
+            argval_match = re.search(r'\(([^)]+)\)', argrepr)
+            if argval_match:
+                return argval_match.group(1)
+        return None
+    
+    def _build_analysis_from_functions(self, functions: List[FunctionInfo], main_function: FunctionInfo) -> BytecodeAnalysis:
+        """Build BytecodeAnalysis from function list"""
+        all_instructions = []
+        jump_targets = set()
+        local_vars = set()
+        global_vars = set()
+        constants = set()
+        function_calls = []
+        
+        for func in functions:
+            all_instructions.extend(func.instructions)
+            local_vars.update(func.varnames)
+            global_vars.update(func.names)
+            constants.update(str(c) for c in func.constants if c is not None)
+            
+            for instr in func.instructions:
+                if instr.instruction_type == InstructionType.CALL and instr.argval:
+                    function_calls.append(instr.argval)
+                if instr.is_jump_target:
+                    jump_targets.add(instr.offset)
+        
+        return BytecodeAnalysis(
+            instructions=all_instructions,
+            jump_targets=jump_targets,
+            local_vars=local_vars,
+            global_vars=global_vars,
+            constants=constants,
+            function_calls=function_calls,
+            functions=functions,
+            main_function=main_function
+        )
     
     def _calculate_load_store_ratio(self, analysis: BytecodeAnalysis) -> str:
         """Calculate ratio of load to store operations"""
