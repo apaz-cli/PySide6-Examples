@@ -203,8 +203,10 @@ class MonacoEditorWidget(QWidget):
         with open(template_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
-        # Replace the Monaco path placeholder
+        # Replace placeholders
         html_content = html_content.replace('MONACO_PATH_PLACEHOLDER', f'file:///{monaco_abs_path}')
+        initial_theme = theme_manager.get_monaco_theme()
+        html_content = html_content.replace('INITIAL_THEME_PLACEHOLDER', initial_theme)
         
         # Write HTML file
         with open(html_file, 'w', encoding='utf-8') as f:
