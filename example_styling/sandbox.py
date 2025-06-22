@@ -697,6 +697,31 @@ class SandboxWidget(QWidget):
         if matching_instructions:
             self._scroll_to_anchor(f'#instr_{matching_instructions[0]}')
     
+    def handle_bytecode_link(self, url):
+        """Handle clicking on bytecode navigation links"""
+        url_str = url.toString()
+        
+        if url_str.startswith('#offset_'):
+            self._scroll_to_anchor(url_str)
+        elif url_str.startswith('#var_'):
+            if '_' in url_str[5:]:
+                self._scroll_to_anchor(url_str)
+            else:
+                var_name = url_str[5:]
+                self._highlight_variable_uses(var_name)
+        elif url_str.startswith('#func_'):
+            self._scroll_to_anchor(url_str)
+        elif url_str.startswith('#call_'):
+            func_name = url_str[6:]
+            self._highlight_function_calls(func_name)
+        elif url_str.startswith('#instr_'):
+            self._scroll_to_anchor(url_str)
+        elif url_str.startswith('#var_usage_'):
+            var_name = url_str[11:]
+            self._highlight_variable_uses(var_name)
+        elif url_str.startswith('#disasm_'):
+            self._scroll_to_anchor(url_str)
+    
     def apply_theme(self):
         """Apply current theme to the widget"""
         # Apply text edit styles
