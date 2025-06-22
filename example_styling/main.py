@@ -352,19 +352,6 @@ class MainWindow(QMainWindow):
         # Add all to main layout
         main_layout.addWidget(self.controls_group)
         main_layout.addLayout(content_layout)
-        
-        # Status label
-        self.status_label = QLabel("Background: Default gradient")
-        self.status_label.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                font-size: 12px;
-                padding: 5px;
-                background-color: rgba(255, 255, 255, 120);
-                border-radius: 3px;
-            }
-        """)
-        main_layout.addWidget(self.status_label)
     
     def style_button(self, button):
         if self.dark_mode:
@@ -509,15 +496,6 @@ class MainWindow(QMainWindow):
                     border-radius: 10px;
                 }
             """
-            status_style = """
-                QLabel {
-                    color: #ecf0f1;
-                    font-size: 12px;
-                    padding: 5px;
-                    background-color: rgba(44, 62, 80, 120);
-                    border-radius: 3px;
-                }
-            """
             slider_label_style = "color: #ecf0f1; font-weight: bold;"
             
             combo_style = """
@@ -649,15 +627,6 @@ class MainWindow(QMainWindow):
                     border-radius: 10px;
                 }
             """
-            status_style = """
-                QLabel {
-                    color: #2c3e50;
-                    font-size: 12px;
-                    padding: 5px;
-                    background-color: rgba(255, 255, 255, 120);
-                    border-radius: 3px;
-                }
-            """
             slider_label_style = "color: #2c3e50; font-weight: bold;"
             
             combo_style = """
@@ -719,7 +688,6 @@ class MainWindow(QMainWindow):
         self.info_label.setStyleSheet(label_style)
         
         self.opacity_slider.setStyleSheet(slider_style)
-        self.status_label.setStyleSheet(status_style)
         
         # Update explorer widgets
         self.dir_combo.setStyleSheet(combo_style)
@@ -795,13 +763,9 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(file_path)
             if not pixmap.isNull():
                 self.central_widget.set_background_image(pixmap)
-                self.status_label.setText(f"Background: {os.path.basename(file_path)}")
-            else:
-                self.status_label.setText("Error: Could not load image")
     
     def clear_background(self):
         self.central_widget.set_background_image(None)
-        self.status_label.setText("Background: Default gradient")
     
     def update_background_opacity(self, value):
         opacity = value / 100.0
