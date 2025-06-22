@@ -13,10 +13,13 @@ class ThemeManager(QObject):
     """Centralized theme management for consistent styling"""
     
     theme_changed = Signal(bool)  # dark_mode
+    font_changed = Signal(str, float)  # font_family, font_size
     
     def __init__(self):
         super().__init__()
         self.dark_mode = self._detect_system_theme()
+        self.current_font_family = 'lemon'
+        self.current_font_size = 15.0
     
     def _detect_system_theme(self):
         """Detect if the system is using dark theme"""
@@ -89,6 +92,18 @@ class ThemeManager(QObject):
             self.dark_mode = enabled
             self.theme_changed.emit(self.dark_mode)
     
+    def set_font(self, font_family, font_size=None):
+        """Set global font family and optionally size"""
+        if font_size is None:
+            font_size = self.current_font_size
+        
+        if self.current_font_family != font_family or self.current_font_size != font_size:
+            self.current_font_family = font_family
+            self.current_font_size = font_size
+            self.font_changed.emit(font_family, font_size)
+            # Also emit theme changed to trigger style updates
+            self.theme_changed.emit(self.dark_mode)
+    
     def get_colors(self):
         """Get color palette for current theme"""
         if self.dark_mode:
@@ -144,8 +159,8 @@ class ThemeManager(QObject):
                     border: 2px solid {border_color};
                     border-radius: 10px;
                     padding-top: 20px;
-                    font-family: 'lemon';
-                    font-size: 15pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {self.current_font_size}pt;
                     font-weight: normal;
                     color: {colors['text']};
                 }}
@@ -164,8 +179,8 @@ class ThemeManager(QObject):
                     border: {'1px solid ' + colors['border'] if self.dark_mode else 'none'};
                     padding: 8px 16px;
                     border-radius: 5px;
-                    font-family: 'lemon';
-                    font-size: 12.5pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {max(7.5, self.current_font_size * 0.83)}pt;
                     font-weight: normal;
                 }}
                 QPushButton:hover {{
@@ -200,8 +215,8 @@ class ThemeManager(QObject):
             return f"""
                 QLabel {{
                     color: {colors['text']};
-                    font-family: 'lemon';
-                    font-size: {size}pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {size if size != 12.5 else self.current_font_size * 0.83}pt;
                     padding: {padding}px;
                     background-color: {bg_color};
                     border-radius: 5px;
@@ -215,8 +230,8 @@ class ThemeManager(QObject):
                     border: 1px solid {colors['border']};
                     border-radius: 5px;
                     padding: 5px;
-                    font-family: 'lemon';
-                    font-size: 12.5pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {self.current_font_size * 0.83}pt;
                     color: {colors['text']};
                 }}
                 QComboBox::drop-down {{
@@ -230,8 +245,8 @@ class ThemeManager(QObject):
                     background-color: {colors['background'].replace('120', '80')};
                     border: 1px solid {colors['border']};
                     border-radius: 5px;
-                    font-family: 'lemon';
-                    font-size: 12.5pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {self.current_font_size * 0.83}pt;
                     color: {colors['text']};
                 }}
                 QTreeView::item {{
@@ -246,14 +261,14 @@ class ThemeManager(QObject):
             """
         
         elif widget_type == 'text':
-            return f"color: {colors['text']}; font-family: 'lemon'; font-size: 12.5pt; font-weight: normal;"
+            return f"color: {colors['text']}; font-family: '{self.current_font_family}'; font-size: {self.current_font_size * 0.83}pt; font-weight: normal;"
         
         elif widget_type == 'placeholder':
             return f"""
                 QLabel {{
                     color: {colors['text_secondary']};
-                    font-family: 'lemon';
-                    font-size: 12.5pt;
+                    font-family: '{self.current_font_family}';
+                    font-size: {self.current_font_size * 0.83}pt;
                     font-style: normal;
                     padding: 20px;
                     background-color: {colors['background'].replace('120', '50')};

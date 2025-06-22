@@ -3,7 +3,7 @@ import os
 from PySide6.QtCore import Qt, QUrl, QTimer, QDir, QFileInfo
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QLabel, QTextEdit,
-                               QGroupBox, QSlider, QFileDialog)
+                               QGroupBox, QSlider, QFileDialog, QFontDialog)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 from monaco_widget import MonacoEditorWidget
@@ -82,6 +82,7 @@ class MainWindow(QMainWindow):
         
         # Connect to theme manager
         theme_manager.theme_changed.connect(self.on_theme_changed)
+        theme_manager.font_changed.connect(self.on_font_changed)
         main_layout = QVBoxLayout(self.central_widget)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -105,9 +106,13 @@ class MainWindow(QMainWindow):
         self.dark_mode_btn = QPushButton("🌙 Dark Mode")
         self.dark_mode_btn.clicked.connect(theme_manager.toggle_dark_mode)
         
+        self.font_btn = QPushButton("🔤 Select Font")
+        self.font_btn.clicked.connect(self.select_font)
+        
         button_layout.addWidget(self.load_bg_btn)
         button_layout.addWidget(self.clear_bg_btn)
         button_layout.addWidget(self.dark_mode_btn)
+        button_layout.addWidget(self.font_btn)
         button_layout.addStretch()
         
         # Set initial button text after button is created
@@ -202,7 +207,7 @@ class MainWindow(QMainWindow):
         
         # Apply button styles
         button_style = theme_manager.get_widget_style('button')
-        for button in [self.load_bg_btn, self.clear_bg_btn, self.dark_mode_btn]:
+        for button in [self.load_bg_btn, self.clear_bg_btn, self.dark_mode_btn, self.font_btn]:
             button.setStyleSheet(button_style)
         
         # Apply other widget styles
@@ -218,6 +223,29 @@ class MainWindow(QMainWindow):
         """Load file content into Monaco editor"""
         self.monaco_editor.set_content(content)
         self.monaco_editor.set_language(language)
+    
+    def select_font(self):
+        """Open font selection dialog"""
+        from PySide6.QtGui import QFont
+        
+        # Create current font object
+        current_font = QFont(theme_manager.current_font_family, int(theme_manager.current_font_size))
+        
+        # Open font dialog
+        font, ok = QFontDialog.getFont(current_font, self, "Select Font")
+        
+        if ok:
+            # Update theme manager with selected font
+            theme_manager.set_font(font.family(), font.pointSizeF())
+    
+    def on_font_changed(self, font_family, font_size):
+        """Handle font changes"""
+        # Update Monaco editor font
+        if self.monaco_editor.is_ready():
+            self.monaco_editor.set_editor_options(
+                fontFamily=f"{font_family}, monospace",
+                fontSize=int(font_size)
+            )
 
     
     def on_editor_content_changed(self, content):

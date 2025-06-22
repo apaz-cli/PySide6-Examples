@@ -90,6 +90,7 @@ class MonacoEditorWidget(QWidget):
         
         # Connect to theme manager
         theme_manager.theme_changed.connect(self.apply_theme)
+        theme_manager.font_changed.connect(self.on_font_changed)
         self.apply_theme()
     
     def _verify_monaco_installation(self):
@@ -119,13 +120,19 @@ class MonacoEditorWidget(QWidget):
             # Apply Monaco theme
             monaco_theme = theme_manager.get_monaco_theme()
             self.set_theme(monaco_theme)
+            # Apply font settings
+            self.set_editor_options(
+                fontFamily=f"{theme_manager.current_font_family}, monospace",
+                fontSize=int(theme_manager.current_font_size)
+            )
         elif not self.editor_available:
             # Update fallback UI styling
             colors = theme_manager.get_colors()
             self.fallback_label.setStyleSheet(f"""
                 QLabel {{
                     color: {colors['accent']};
-                    font-size: 14px;
+                    font-family: '{theme_manager.current_font_family}';
+                    font-size: {theme_manager.current_font_size}pt;
                     font-weight: bold;
                     padding: 20px;
                     background-color: {colors['input_bg']};
@@ -137,12 +144,21 @@ class MonacoEditorWidget(QWidget):
             self.info_label.setStyleSheet(f"""
                 QLabel {{
                     color: {colors['text_secondary']};
-                    font-size: 12px;
+                    font-family: '{theme_manager.current_font_family}';
+                    font-size: {theme_manager.current_font_size * 0.8}pt;
                     padding: 10px;
                     background-color: {colors['background'].replace('120', '80')};
                     border-radius: 5px;
                 }}
             """)
+    
+    def on_font_changed(self, font_family, font_size):
+        """Handle font changes"""
+        if self.editor_available and self.is_ready():
+            self.set_editor_options(
+                fontFamily=f"{font_family}, monospace",
+                fontSize=int(font_size)
+            )
     
     def _setup_monaco_ui(self):
         """Set up Monaco editor UI"""
@@ -207,6 +223,7 @@ class MonacoEditorWidget(QWidget):
         html_content = html_content.replace('MONACO_PATH_PLACEHOLDER', f'file:///{monaco_abs_path}')
         initial_theme = theme_manager.get_monaco_theme()
         html_content = html_content.replace('INITIAL_THEME_PLACEHOLDER', initial_theme)
+        html_content = html_content.replace('FONT_FAMILY_PLACEHOLDER', theme_manager.current_font_family)
         
         # Write HTML file
         with open(html_file, 'w', encoding='utf-8') as f:
