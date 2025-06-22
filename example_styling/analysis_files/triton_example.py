@@ -181,7 +181,6 @@ def softmax_dropout_fast(x, dropout_p=0.1, training=True):
         BLOCK_SIZE = 1024
         n_blocks = triton.cdiv(n_cols, BLOCK_SIZE)
         grid = (n_rows, n_blocks)
-        print(f"Warning: Large sequence {n_cols}, using multi-block")
     
     return output
 
