@@ -4,6 +4,8 @@ A Monaco Editor widget that integrates with the theme system.
 """
 
 import os
+import tempfile
+import atexit
 from pathlib import Path
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QMessageBox
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -53,6 +55,10 @@ class MonacoEditorWidget(QWidget):
     content_changed = Signal(str)
     editor_ready = Signal()
     
+    # Class-level temp directory for all Monaco instances
+    _temp_dir = None
+    _temp_files = []
+    
     def __init__(self, parent=None, monaco_path=None):
         """
         Initialize the Monaco Editor widget.
@@ -63,6 +69,9 @@ class MonacoEditorWidget(QWidget):
         """
         super().__init__(parent)
         
+        # Initialize temp directory if needed
+        self._ensure_temp_dir()
+        
         # Find Monaco Editor path
         if monaco_path:
             self.monaco_path = Path(monaco_path)
@@ -71,6 +80,7 @@ class MonacoEditorWidget(QWidget):
         
         # Check if Monaco is available
         self.editor_available = self._verify_monaco_installation()
+        self.html_file = None
         
         if self.editor_available:
             # Create the Monaco interface
@@ -92,6 +102,33 @@ class MonacoEditorWidget(QWidget):
         theme_manager.theme_changed.connect(self.apply_theme)
         theme_manager.font_changed.connect(self.on_font_changed)
         self.apply_theme()
+    
+    @classmethod
+    def _ensure_temp_dir(cls):
+        """Ensure temp directory exists for Monaco files"""
+        if cls._temp_dir is None:
+            cls._temp_dir = Path(tempfile.gettempdir()) / "perfwizard"
+            cls._temp_dir.mkdir(exist_ok=True)
+            
+            # Register cleanup on exit
+            atexit.register(cls._cleanup_temp_files)
+    
+    @classmethod
+    def _cleanup_temp_files(cls):
+        """Clean up all temporary Monaco files"""
+        for temp_file in cls._temp_files:
+            try:
+                if temp_file.exists():
+                    temp_file.unlink()
+            except:
+                pass  # Ignore cleanup errors
+        
+        # Try to remove temp directory if empty
+        try:
+            if cls._temp_dir and cls._temp_dir.exists():
+                cls._temp_dir.rmdir()
+        except:
+            pass  # Directory not empty or other error
     
     def _verify_monaco_installation(self):
         """Verify that Monaco Editor is properly installed"""
@@ -210,9 +247,14 @@ class MonacoEditorWidget(QWidget):
         self.web_view.load(QUrl.fromLocalFile(str(html_file.resolve())))
     
     def _create_html_file(self):
-        """Create the HTML file for Monaco Editor"""
+        """Create the HTML file for Monaco Editor in temp directory"""
         template_file = Path(__file__).parent / "monaco_template.html"
-        html_file = Path(__file__).parent / "monaco_editor_widget.html"
+        
+        # Create unique temp file for this instance
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+        self.html_file = self._temp_dir / f"monaco_editor_{unique_id}.html"
+        
         monaco_abs_path = self.monaco_path.resolve().as_posix()
         
         # Read template and replace placeholder
@@ -226,10 +268,13 @@ class MonacoEditorWidget(QWidget):
         html_content = html_content.replace('FONT_FAMILY_PLACEHOLDER', theme_manager.current_font_family)
         
         # Write HTML file
-        with open(html_file, 'w', encoding='utf-8') as f:
+        with open(self.html_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        return html_file
+        # Track temp file for cleanup
+        self._temp_files.append(self.html_file)
+        
+        return self.html_file
     
     # Public API methods
     
@@ -340,10 +385,12 @@ class MonacoEditorWidget(QWidget):
     
     def cleanup(self):
         """Clean up temporary files (call when widget is destroyed)"""
-        html_file = Path(__file__).parent / "monaco_editor_widget.html"
-        if html_file.exists():
+        if self.html_file and self.html_file.exists():
             try:
-                html_file.unlink()
+                self.html_file.unlink()
+                # Remove from class tracking list
+                if self.html_file in self._temp_files:
+                    self._temp_files.remove(self.html_file)
             except:
                 pass  # Ignore cleanup errors
     
