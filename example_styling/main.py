@@ -3,11 +3,11 @@ import os
 from PySide6.QtCore import Qt, QUrl, QTimer, QDir, QFileInfo
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QLabel, QTextEdit,
-                               QGroupBox, QSlider, QFileDialog, QTreeView, QComboBox,
-                               QFileSystemModel)
+                               QGroupBox, QSlider, QFileDialog)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtGui import QPalette, QBrush, QPixmap, QPainter, QLinearGradient, QColor
 from monaco_widget import StyledMonacoWidget
+from file_explorer import FileExplorer
 from theme_manager import theme_manager
 
 
@@ -133,39 +133,8 @@ class MainWindow(QMainWindow):
         content_layout = QHBoxLayout()
         
         # File Explorer section
-        self.explorer_group = QGroupBox("File Explorer")
-        self.explorer_group.setObjectName("explorer_group")
-        explorer_layout = QVBoxLayout()
-        
-        # Directory dropdown
-        self.dir_combo = QComboBox()
-        self.dir_combo.addItem("Current Directory", os.getcwd())
-        self.dir_combo.addItem("Home Directory", os.path.expanduser("~"))
-        self.dir_combo.addItem("Root Directory", "/")
-        self.dir_combo.currentTextChanged.connect(self.change_directory)
-        
-        # File tree view
-        self.file_model = QFileSystemModel()
-        self.file_model.setRootPath(os.getcwd())
-        self.file_tree = QTreeView()
-        self.file_tree.setModel(self.file_model)
-        self.file_tree.setRootIndex(self.file_model.index(os.getcwd()))
-        self.file_tree.setColumnWidth(0, 200)
-        self.file_tree.hideColumn(1)  # Hide size column
-        self.file_tree.hideColumn(2)  # Hide type column
-        self.file_tree.hideColumn(3)  # Hide date column
-        self.file_tree.setHeaderHidden(True)  # Hide the header with "Name"
-        self.file_tree.clicked.connect(self.file_selected)
-        
-        # Selected file label
-        self.selected_file_label = QLabel("No file selected")
-        self.selected_file_label.setWordWrap(True)
-        
-        explorer_layout.addWidget(QLabel("Directory:"))
-        explorer_layout.addWidget(self.dir_combo)
-        explorer_layout.addWidget(self.file_tree)
-        explorer_layout.addWidget(self.selected_file_label)
-        self.explorer_group.setLayout(explorer_layout)
+        self.file_explorer = FileExplorer()
+        self.file_explorer.content_ready.connect(self.load_file_content)
         
         # Monaco Editor section
         self.editor_group = QGroupBox("Monaco Editor")
@@ -197,7 +166,7 @@ class MainWindow(QMainWindow):
         self.placeholder_group.setLayout(placeholder_layout)
         
         # Add to content layout
-        content_layout.addWidget(self.explorer_group, 1)
+        content_layout.addWidget(self.file_explorer, 1)
         content_layout.addWidget(self.editor_group, 2)
         content_layout.addWidget(self.placeholder_group, 1)
         
@@ -224,7 +193,6 @@ class MainWindow(QMainWindow):
         """Apply current theme to all widgets"""
         # Apply group box styles
         self.controls_group.setStyleSheet(theme_manager.get_group_box_style('primary'))
-        self.explorer_group.setStyleSheet(theme_manager.get_group_box_style('purple'))
         self.editor_group.setStyleSheet(theme_manager.get_group_box_style('secondary'))
         self.placeholder_group.setStyleSheet(theme_manager.get_group_box_style('accent'))
         
@@ -238,60 +206,14 @@ class MainWindow(QMainWindow):
         self.opacity_label.setStyleSheet(theme_manager.get_text_label_style())
         self.opacity_slider.setStyleSheet(theme_manager.get_slider_style())
         
-        # Apply explorer widget styles
-        self.dir_combo.setStyleSheet(theme_manager.get_combo_box_style())
-        self.file_tree.setStyleSheet(theme_manager.get_tree_view_style())
-        self.selected_file_label.setStyleSheet(theme_manager.get_small_label_style())
-        
         # Apply placeholder styles
         self.info_label.setStyleSheet(theme_manager.get_label_style())
         self.placeholder_content.setStyleSheet(theme_manager.get_placeholder_content_style())
     
-    
-    def change_directory(self, text):
-        """Change the file explorer directory"""
-        current_data = self.dir_combo.currentData()
-        if current_data and os.path.exists(current_data):
-            self.file_model.setRootPath(current_data)
-            self.file_tree.setRootIndex(self.file_model.index(current_data))
-            self.selected_file_label.setText("No file selected")
-    
-    def file_selected(self, index):
-        """Handle file selection in the tree view"""
-        file_path = self.file_model.filePath(index)
-        file_info = QFileInfo(file_path)
-        
-        if file_info.isFile():
-            file_name = file_info.fileName()
-            file_size = file_info.size()
-            
-            # Format file size
-            if file_size < 1024:
-                size_str = f"{file_size} B"
-            elif file_size < 1024 * 1024:
-                size_str = f"{file_size / 1024:.1f} KB"
-            else:
-                size_str = f"{file_size / (1024 * 1024):.1f} MB"
-            
-            self.selected_file_label.setText(f"Selected: {file_name}\nSize: {size_str}")
-            
-            # If it's a text file, load it into the Monaco editor
-            text_extensions = ['.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md', '.cpp', '.c', '.h', '.java']
-            if any(file_name.lower().endswith(ext) for ext in text_extensions):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        if len(content) < 50000:  # Only load reasonably sized files
-                            self.monaco_editor.set_content(content)
-                            self.monaco_editor.detect_language_from_filename(file_name)
-                        else:
-                            self.monaco_editor.set_content(f"# File too large to display ({size_str})")
-                            self.monaco_editor.set_language("plaintext")
-                except Exception as e:
-                    self.monaco_editor.set_content(f"# Error reading file: {str(e)}")
-                    self.monaco_editor.set_language("plaintext")
-        else:
-            self.selected_file_label.setText(f"Directory: {file_info.fileName()}")
+    def load_file_content(self, content, language):
+        """Load file content into Monaco editor"""
+        self.monaco_editor.set_content(content)
+        self.monaco_editor.set_language(language)
 
     
     def on_editor_content_changed(self, content):
