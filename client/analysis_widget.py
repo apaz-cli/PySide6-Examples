@@ -327,7 +327,12 @@ class AnalysisWidget(QWidget):
     def on_analysis_complete(self, result: AnalysisResult):
         """Handle analysis completion"""
         if not result:
-            self.status_label.setText("Analysis failed - no result")
+            # Check if server is still reachable
+            if not self.api_client.health_check():
+                self.server_available = False
+                self.show_server_unavailable_message()
+            else:
+                self.status_label.setText("Analysis failed - no result")
             return
         
         if not result.success:
