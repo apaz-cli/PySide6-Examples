@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Top controls section
-        self.controls_group = QGroupBox("Native Qt Controls")
+        self.controls_group = QGroupBox("Settings")
         self.controls_group.setObjectName("controls_group")
         controls_layout = QVBoxLayout()
         
@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
         self.file_explorer.file_selected.connect(self.on_file_selected)
         
         # Monaco Editor section
-        self.editor_group = QGroupBox("Monaco Editor")
+        self.editor_group = QGroupBox("Editor")
         self.editor_group.setObjectName("editor_group")
         editor_layout = QVBoxLayout()
         
