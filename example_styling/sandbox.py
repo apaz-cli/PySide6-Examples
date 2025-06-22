@@ -192,9 +192,20 @@ class SandboxWidget(QWidget):
         else:
             self.ast_text.setPlainText("No AST data available")
         
-        # Update disassembly tab
+        # Update disassembly tab with enhanced formatting
         if dis_result:
-            self.dis_text.setPlainText(dis_result)
+            try:
+                # Parse and format the bytecode with colors and links
+                bytecode_analysis = self.analyzer.bytecode_parser.parse_disassembly(dis_result)
+                formatted_html = self.format_bytecode_html(bytecode_analysis)
+                self.dis_text.setHtml(formatted_html)
+                
+                # Enable link clicking for jumps
+                self.dis_text.setOpenExternalLinks(False)
+                self.dis_text.anchorClicked.connect(self.handle_jump_click)
+            except Exception as e:
+                # Fallback to plain text if formatting fails
+                self.dis_text.setPlainText(dis_result)
         else:
             self.dis_text.setPlainText("No disassembly data available")
         
@@ -224,6 +235,105 @@ class SandboxWidget(QWidget):
         self.analysis_text.setPlainText("Select a Python file to see bytecode analysis")
         self.error_text.setPlainText("No errors")
         self.status_label.setText("No Python file selected")
+    
+    def format_bytecode_html(self, bytecode_analysis):
+        """Format bytecode with HTML colors and clickable jump links"""
+        colors = theme_manager.get_colors()
+        
+        # Color scheme for different instruction types
+        color_map = {
+            'LOAD': colors['primary'],      # Blue for loads
+            'STORE': colors['accent'],      # Red for stores  
+            'CALL': colors['secondary'],    # Green for calls
+            'JUMP': '#f39c12',             # Orange for jumps
+            'COMPARE': '#9b59b6',          # Purple for comparisons
+            'BINARY_OP': '#e67e22',        # Orange for binary ops
+            'BUILD': '#1abc9c',            # Teal for build ops
+            'RETURN': '#e74c3c',           # Red for returns
+            'LOOP': '#f1c40f',             # Yellow for loops
+            'OTHER': colors['text_secondary']  # Gray for others
+        }
+        
+        lines = []
+        
+        for instruction in bytecode_analysis.instructions:
+            # Format the instruction line
+            target_marker = "&gt;&gt;" if instruction.is_jump_target else "&nbsp;&nbsp;"
+            
+            # Add anchor for jump targets
+            anchor = ""
+            if instruction.is_jump_target:
+                anchor = f'<a name="offset_{instruction.offset}"></a>'
+            
+            # Color based on instruction type
+            color = color_map.get(instruction.instruction_type.name, color_map['OTHER'])
+            
+            # Format line number if present
+            line_info = f"({instruction.line_number:3d})" if instruction.line_number else "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            
+            # Format the instruction
+            if instruction.arg is not None:
+                instr_text = f"{instruction.offset:4d} {instruction.opname:<20} {instruction.arg:4d}"
+                if instruction.argrepr:
+                    instr_text += f" {instruction.argrepr}"
+            else:
+                instr_text = f"{instruction.offset:4d} {instruction.opname:<20}"
+            
+            # Make jump targets clickable
+            if instruction.instruction_type.name == 'JUMP' and instruction.argrepr:
+                # Extract target offset from argrepr
+                import re
+                target_match = re.search(r'(\d+)', instruction.argrepr)
+                if target_match:
+                    target_offset = target_match.group(1)
+                    if int(target_offset) in bytecode_analysis.jump_targets:
+                        # Make the target offset clickable
+                        instr_text = instr_text.replace(
+                            target_offset,
+                            f'<a href="#offset_{target_offset}" style="color: {color}; text-decoration: underline;">{target_offset}</a>'
+                        )
+            
+            # Highlight jump targets
+            if instruction.is_jump_target:
+                line_style = f'style="background-color: {colors["hover"]}; font-weight: bold;"'
+            else:
+                line_style = ""
+            
+            formatted_line = f'<span {line_style}>{anchor}{target_marker} {line_info} <span style="color: {color};">{instr_text}</span></span>'
+            lines.append(formatted_line)
+        
+        # Wrap in pre tag with monospace font
+        font_family = theme_manager.current_font_family
+        font_size = max(7.5, theme_manager.current_font_size * 0.8)
+        
+        html = f'''
+        <pre style="font-family: '{font_family}', monospace; font-size: {font_size}pt; 
+                   line-height: 1.2; margin: 0; padding: 10px;
+                   background-color: transparent; color: {colors['text']};">
+        {'<br>'.join(lines)}
+        </pre>
+        '''
+        
+        return html
+    
+    def handle_jump_click(self, url):
+        """Handle clicking on jump links"""
+        anchor = url.toString()
+        if anchor.startswith('#offset_'):
+            # Find the anchor and scroll to it
+            cursor = self.dis_text.textCursor()
+            cursor.movePosition(cursor.Start)
+            
+            # Search for the anchor
+            if self.dis_text.find(anchor.replace('#', '')):
+                self.dis_text.ensureCursorVisible()
+                # Highlight the target line briefly
+                self.highlight_jump_target()
+    
+    def highlight_jump_target(self):
+        """Briefly highlight the jump target"""
+        # This could be enhanced with a timer to remove highlight
+        pass
     
     def apply_theme(self):
         """Apply current theme to the widget"""

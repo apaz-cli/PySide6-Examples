@@ -296,4 +296,43 @@ class BytecodeParser:
             if len(analysis.function_calls) > 10:
                 summary.append(f"  ... and {len(analysis.function_calls) - 10} more")
         
+        # Add jump analysis
+        if analysis.jumps:
+            summary.append("")
+            summary.append(f"🔀 Jump Analysis:")
+            summary.append(f"  Total Jumps: {len(analysis.jumps)}")
+            
+            # Group jumps by type
+            jump_types = {}
+            for jump in analysis.jumps:
+                jump_types[jump.opname] = jump_types.get(jump.opname, 0) + 1
+            
+            for jump_type, count in sorted(jump_types.items()):
+                summary.append(f"    {jump_type}: {count}")
+        
+        # Add complexity metrics
+        summary.append("")
+        summary.append(f"📈 Complexity Metrics:")
+        summary.append(f"  Cyclomatic Complexity: {self._calculate_cyclomatic_complexity(analysis)}")
+        summary.append(f"  Load/Store Ratio: {self._calculate_load_store_ratio(analysis)}")
+        
         return '\n'.join(summary)
+    
+    def _calculate_cyclomatic_complexity(self, analysis: BytecodeAnalysis) -> int:
+        """Calculate approximate cyclomatic complexity from bytecode"""
+        # Count decision points (jumps + 1)
+        decision_points = len([instr for instr in analysis.instructions 
+                             if instr.opname in ['POP_JUMP_IF_TRUE', 'POP_JUMP_IF_FALSE', 
+                                               'JUMP_IF_TRUE_OR_POP', 'JUMP_IF_FALSE_OR_POP']])
+        return decision_points + 1
+    
+    def _calculate_load_store_ratio(self, analysis: BytecodeAnalysis) -> str:
+        """Calculate ratio of load to store operations"""
+        loads = len(analysis.loads)
+        stores = len(analysis.stores)
+        
+        if stores == 0:
+            return f"{loads}:0 (all loads)" if loads > 0 else "0:0"
+        
+        ratio = loads / stores
+        return f"{loads}:{stores} ({ratio:.2f}:1)"
