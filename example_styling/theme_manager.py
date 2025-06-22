@@ -216,7 +216,7 @@ class ThemeManager(QObject):
                 QLabel {{
                     color: {colors['text']};
                     font-family: '{self.current_font_family}';
-                    font-size: {size if size != 12.5 else self.current_font_size * 0.83}pt;
+                    font-size: {max(7.5, size if size != 12.5 else self.current_font_size * 0.83)}pt;
                     padding: {padding}px;
                     background-color: {bg_color};
                     border-radius: 5px;
@@ -231,7 +231,7 @@ class ThemeManager(QObject):
                     border-radius: 5px;
                     padding: 5px;
                     font-family: '{self.current_font_family}';
-                    font-size: {self.current_font_size * 0.83}pt;
+                    font-size: {max(7.5, self.current_font_size * 0.83)}pt;
                     color: {colors['text']};
                 }}
                 QComboBox::drop-down {{
@@ -246,7 +246,7 @@ class ThemeManager(QObject):
                     border: 1px solid {colors['border']};
                     border-radius: 5px;
                     font-family: '{self.current_font_family}';
-                    font-size: {self.current_font_size * 0.83}pt;
+                    font-size: {max(7.5, self.current_font_size * 0.83)}pt;
                     color: {colors['text']};
                 }}
                 QTreeView::item {{
@@ -261,14 +261,14 @@ class ThemeManager(QObject):
             """
         
         elif widget_type == 'text':
-            return f"color: {colors['text']}; font-family: '{self.current_font_family}'; font-size: {self.current_font_size * 0.83}pt; font-weight: normal;"
+            return f"color: {colors['text']}; font-family: '{self.current_font_family}'; font-size: {max(7.5, self.current_font_size * 0.83)}pt; font-weight: normal;"
         
         elif widget_type == 'placeholder':
             return f"""
                 QLabel {{
                     color: {colors['text_secondary']};
                     font-family: '{self.current_font_family}';
-                    font-size: {self.current_font_size * 0.83}pt;
+                    font-size: {max(7.5, self.current_font_size * 0.83)}pt;
                     font-style: normal;
                     padding: 20px;
                     background-color: {colors['background'].replace('120', '50')};

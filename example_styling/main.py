@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
         current_font = QFont(theme_manager.current_font_family, int(theme_manager.current_font_size))
         
         # Open font dialog
-        ok, font = QFontDialog.getFont(current_font, self, "Select Font")
+        font, ok = QFontDialog.getFont(current_font, self, "Select Font")
         
         if ok:
             # Update theme manager with selected font
