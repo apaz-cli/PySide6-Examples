@@ -238,10 +238,6 @@ class AnalysisWidget(QWidget):
             self.clear_analysis()
             return
         
-        if not self.server_available:
-            self.show_server_unavailable_message()
-            return
-        
         file_path = Path(file_path)
         self.current_file = file_path
         
@@ -264,7 +260,7 @@ class AnalysisWidget(QWidget):
         
         self.status_label.setText(f"Analyzing {file_path.name} with {analyzer_type}...")
         
-        # Start analysis in worker thread
+        # Start analysis in worker thread - always attempt, let the result determine server availability
         self.worker = AnalysisWorker(self.api_client, str(file_path), analyzer_type)
         self.worker.analysis_complete.connect(self.on_analysis_complete)
         self.worker.start()
