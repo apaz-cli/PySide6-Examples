@@ -223,6 +223,7 @@ class MainWindow(QMainWindow):
         self.file_tree.hideColumn(1)  # Hide size column
         self.file_tree.hideColumn(2)  # Hide type column
         self.file_tree.hideColumn(3)  # Hide date column
+        self.file_tree.setHeaderHidden(True)  # Hide the header with "Name"
         self.file_tree.clicked.connect(self.file_selected)
         self.file_tree.setStyleSheet("""
             QTreeView {
