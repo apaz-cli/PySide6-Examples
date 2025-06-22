@@ -526,8 +526,10 @@ class AnalysisWidget(QWidget):
             self.rust_hir_text, self.rust_mir_text, self.rust_llvm_text, self.rust_analysis_text,
             # Triton tabs
             self.triton_ast_text, self.triton_ptx_text, self.triton_perf_text,
-            # Shared tabs
-            self.error_text
+            # CUDA tabs
+            self.cuda_ast_text, self.cuda_ptx_text, self.cuda_sass_text, self.cuda_perf_text,
+            # HIP tabs
+            self.hip_ast_text, self.hip_gcn_text, self.hip_llvm_text, self.hip_perf_text
         ]
         
         for text_widget in text_widgets:
