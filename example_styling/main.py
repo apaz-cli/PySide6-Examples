@@ -13,7 +13,7 @@ from theme_manager import theme_manager
 from settings import settings_manager
 
 
-class TransparentWidget(QWidget):
+class BackgroundWidget(QWidget):
     """Base widget with background image support"""
     def __init__(self):
         super().__init__()
@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self._load_settings()
         
         # Create custom central widget with background support
-        self.central_widget = TransparentWidget()
+        self.central_widget = BackgroundWidget()
         self.setCentralWidget(self.central_widget)
         
         # Connect to theme manager
