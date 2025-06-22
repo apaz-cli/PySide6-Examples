@@ -335,6 +335,10 @@ class AnalysisWidget(QWidget):
             self.status_label.setText(f"Analysis failed: {error_msg}")
             return
         
+        # Server is working again - update availability status
+        if not self.server_available:
+            self.server_available = True
+        
         # Display results based on analyzer type
         if result.analyzer_type == 'python':
             self.display_python_analysis(result)
@@ -520,6 +524,8 @@ class AnalysisWidget(QWidget):
         
         if self.server_available:
             self.status_label.setText("Analysis server connected")
+            # Reset status label style in case it was showing error
+            self.status_label.setStyleSheet(theme_manager.get_widget_style('label', font_size=8.0, padding=5))
             # Load hello world example
             self.analyze_hello_world_example()
         else:
