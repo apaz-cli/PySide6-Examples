@@ -3,6 +3,7 @@ Theme Manager for PySide6 Applications
 Provides centralized styling and theme management.
 """
 
+import os
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
@@ -19,21 +20,59 @@ class ThemeManager(QObject):
     
     def _detect_system_theme(self):
         """Detect if the system is using dark theme"""
+        import platform
+        import subprocess
+        
+        system = platform.system()
+        
         try:
-            app = QApplication.instance()
-            if app:
-                palette = app.palette()
-                # Check if window background is darker than text color
-                window_color = palette.color(QPalette.Window)
-                text_color = palette.color(QPalette.WindowText)
+            if system == "Darwin":  # macOS
+                result = subprocess.run([
+                    "defaults", "read", "-g", "AppleInterfaceStyle"
+                ], capture_output=True, text=True, timeout=2)
+                return result.returncode == 0 and "Dark" in result.stdout
+            
+            elif system == "Windows":
+                try:
+                    import winreg
+                    registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+                    key = winreg.OpenKey(registry, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+                    value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                    winreg.CloseKey(key)
+                    return value == 0  # 0 = dark theme, 1 = light theme
+                except (ImportError, OSError):
+                    pass
+            
+            elif system == "Linux":
+                # Try GNOME/GTK settings
+                try:
+                    result = subprocess.run([
+                        "gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"
+                    ], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0:
+                        theme_name = result.stdout.strip().strip("'\"").lower()
+                        return "dark" in theme_name
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
                 
-                # Calculate luminance to determine if background is dark
-                window_luminance = (0.299 * window_color.red() + 
-                                  0.587 * window_color.green() + 
-                                  0.114 * window_color.blue()) / 255
+                # Try KDE settings
+                try:
+                    result = subprocess.run([
+                        "kreadconfig5", "--group", "General", "--key", "ColorScheme"
+                    ], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0:
+                        scheme = result.stdout.strip().lower()
+                        return "dark" in scheme or "breeze dark" in scheme
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
                 
-                return window_luminance < 0.5
-        except:
+                # Check environment variables
+                if "DESKTOP_SESSION" in os.environ:
+                    session = os.environ["DESKTOP_SESSION"].lower()
+                    if "dark" in session:
+                        return True
+        
+        except Exception:
             pass
         
         # Fallback to light theme if detection fails
